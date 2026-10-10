@@ -5,5 +5,6 @@ export const ARTS = {
   well: { name: 'Gravity Well', color: 0x4fb4ff },
   repulsor: { name: 'Repulsor', color: 0xff4a2a },
   pull: { name: 'Pull', color: 0x8affc8 },
+  nullpoint: { name: 'Nullpoint', color: 0xb050ff },
 };
 export const ART_IDS = Object.keys(ARTS);

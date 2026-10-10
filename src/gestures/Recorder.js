@@ -65,6 +65,15 @@ export class Recorder {
     this.onSaved?.(sigil); // the spellbook adds a page
   }
 
+  // Save a two-hand Sigil straight from a live two-hand vector (hand-sign combinations use this instead of the 1 s capture).
+  makeTwoHandSigil(vec, artId, name) {
+    const hw = handWeights({ curl: [3, 3, 3, 3, 3], normal: 1, tips: 1 });
+    const w = new Float32Array(vec.length);
+    w.set(hw, 0); w.set(hw, HAND_DIM); w.fill(1, HAND_DIM * 2);
+    return { id: 'custom-' + Date.now(), name, hand: 'two', artId, thresh: 0.22, vec: Float32Array.from(vec), w };
+  }
+  addSigil(sigil) { this.rec.sigils.push(sigil); saveCustom(this.rec.sigils); this.onChanged?.(); }
+
   clearCustom() {
     this.rec.sigils = this.rec.sigils.filter(s => s.builtin);
     saveCustom(this.rec.sigils);

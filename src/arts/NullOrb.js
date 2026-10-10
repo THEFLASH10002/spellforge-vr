@@ -96,6 +96,7 @@ export class NullOrb {
 
   merge() {
     const w = this.well, r = this.red, mid = w.pos.clone().add(r.pos).multiplyScalar(0.5), c0 = Math.max(w.charge, r.charge);
+    this.onFusion?.(); // merging Blue + Red orbs is the Spell Fusion that unlocks Purple the first time
     w.absorb(); r.absorb();
     fx.shock(mid, UP, 0xb050ff, 3, 1.0);
     fx.burst(mid, 0xe0a0ff, 60, 5);

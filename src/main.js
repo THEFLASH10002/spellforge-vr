@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { PhysicsWorld } from './physics/World.js';
 import { setupHands } from './xr/HandInput.js';
-import { extractHand } from './gestures/PoseFeatures.js';
+import { extractHand, HAND_DIM } from './gestures/PoseFeatures.js';
 import { Recognizer } from './gestures/Recognizer.js';
 import { Recorder, loadCustom, saveCustom } from './gestures/Recorder.js';
 import { BUILTINS } from './gestures/builtins.js';
@@ -23,11 +23,12 @@ import { AssetManager } from './assets/AssetManager.js';
 import { buildTerrain, buildTrainingGround, terrainHeight, onPath, PADS, FLAT } from './world/Terrain.js';
 import { Grass } from './world/Grass.js';
 import { Environment } from './world/Environment.js';
-import { GravityWell, WELL, RED, RED_VARIANT } from './arts/GravityWell.js';
+import { GravityWell, WELL, RED, RED_VARIANT, BLUE_VARIANT } from './arts/GravityWell.js';
 import { WellMood, MOOD } from './vfx/WellMood.js';
 import { NullOrb, NULL } from './arts/NullOrb.js';
 import { Spellbook } from './ui/Spellbook.js';
 import { Locomotion } from './world/Locomotion.js';
+import { Unlocks, recipeFor, recipeOf, UNLOCK_NAMES } from './progress/Unlocks.js';
 import { HandInteract } from './world/HandInteract.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
@@ -77,6 +78,13 @@ const puppets = [[-4, -5], [-1, -6.5], [2.5, -5.5], [5.5, -2.5]].map(([x, z], i)
 
 const recognizer = new Recognizer();
 recognizer.sigils = [...BUILTINS, ...loadCustom()];
+const unlocks = new Unlocks(); // starts with only Bolt, Pull and Repel; Blue, Red and Purple are earned by combining (see progress/Unlocks.js)
+for (const s of recognizer.sigils) if (!s.builtin) unlocks.unlock(s.artId, { silent: true }); // a saved custom sign keeps its spell unlocked
+recognizer.isLocked = sg => unlocks.isLocked(sg.artId);         // locked spells' signs do nothing
+recognizer.canCombine = rec => unlocks.isLocked(rec.result);    // two base signs only combine toward something not yet unlocked
+const artChoices = () => ART_IDS.filter(id => unlocks.has(id)); // "Next Art" / "Rebind" only offer unlocked spells
+let nextArt = 0;
+const curArt = () => { const c = artChoices(); return c[nextArt % c.length]; };
 const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
@@ -87,50 +95,90 @@ const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
 const director = new Director({ targets, caster, onReset: () => { interact.reset(); sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); loco.moveTo(0, 0); placeBook = true; } });
 let lastCast = '-';
-let nextArt = 0;
 const well = new GravityWell({ scene, physics, env, targets });            // Blue: pulls
 const red = new GravityWell({ scene, physics, env, targets, variant: RED_VARIANT }); // Red: repels
 well.other = red; red.other = well;
 const nullOrb = new NullOrb({ scene, physics, env, targets, assets, grass, well, red }); // Purple: Blue + Red merged
-const spellbook = new Spellbook({ scene, assets, getSigils: () => recognizer.sigils }); // every saved Sigil gets a page
+// Spellbook pages: every sign, with locked spells shown as "???" + a hint; Nullpoint (fusion-only) always has a page.
+const ZERO_VEC = new Float32Array(HAND_DIM);
+const lockedHint = id => { const r = recipeOf(id); return r ? 'Combine ' + ARTS[r.a].name + ' + ' + ARTS[r.b].name : ''; };
+const lockedPage = (id, artId) => ({ id, name: '???', artId, hand: 'any', vec: ZERO_VEC, w: ZERO_VEC, builtin: true, locked: true, hint: lockedHint(artId) });
+const spellPages = () => {
+  const out = recognizer.sigils.map(sg => (unlocks.has(sg.artId) ? sg : lockedPage(sg.id, sg.artId)));
+  out.push(unlocks.has('nullpoint') ? { id: 'fusion-nullpoint', name: 'Nullpoint', artId: 'nullpoint', hand: 'fusion', vec: ZERO_VEC, builtin: true } : lockedPage('fusion-nullpoint', 'nullpoint'));
+  return out;
+};
+// FUSE button in the book: two spell pages -> a recipe. (The first unlock of a spell shows its popup via unlocks.onUnlock below.)
+const tryFuse = (a, b) => {
+  const rec = recipeFor(a, b);
+  if (!rec) return { status: 'invalid' };
+  if (!unlocks.unlock(rec.result)) return { status: 'known', result: rec.result };
+  return { status: 'unlocked', result: rec.result };
+};
+const spellbook = new Spellbook({ scene, assets, getPages: spellPages, tryFuse });
 recorder.onSaved = s => spellbook.discover(s);
 recorder.onChanged = () => spellbook.refresh();
+unlocks.onUnlock(id => spellbook.celebrate(id)); // ONE popup per spell, ever: unlock() only reports true the first time
+nullOrb.onFusion = () => unlocks.unlock('nullpoint'); // merging Blue + Red orbs the first time is the fusion that unlocks Purple
+// World effects for an unlock: petals converge + burst, and the scene briefly dims toward the spell's colour (Purple much more).
+const flashes = Object.fromEntries([['well', BLUE_VARIANT.mood], ['repulsor', RED_VARIANT.mood], ['nullpoint', nullOrb.v.mood]]
+  .map(([id, mood]) => [id, { v: { mood }, moodTarget: 0, moodPos: new THREE.Vector3() }]));
+spellbook.onCelebrate = id => {
+  env.onSpell(spellbook.root.position, 'sanctum');
+  if (id === 'nullpoint') env.petals.gust(2.5);
+  const f = flashes[id]; if (!f) return;
+  f.moodPos.copy(spellbook.root.position); f.moodTarget = id === 'nullpoint' ? 0.95 : 0.6;
+  setTimeout(() => { f.moodTarget = 0; }, id === 'nullpoint' ? 2600 : 1500);
+};
 // Locomotion: pinch to teleport (hands), thumbstick (controllers), WASD (desktop). The panel + spellbook travel with you.
 const loco = new Locomotion({ renderer, scene, camera, onMove: d => { panel.mesh.position.add(d); spellbook.root.position.add(d); spellbook.baseY += d.y; } });
 const interact = new HandInteract({ physics, targets }); // punch + grab + carry + throw
 let placeBook = false;
 renderer.xr.addEventListener('sessionstart', () => { placeBook = true; });
-const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red, nullOrb] });
+const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red, nullOrb, ...Object.values(flashes)] });
 recognizer.onCast = (sigil, hand, which) => {
   lastCast = sigil.name;
   if (sigil.artId === 'sanctum') sanctum.activate(presetIdx, ruleIdx);
   else if (sigil.artId === 'well') well.begin(which); // hold + charge + throw (see GravityWell.js)
   else if (sigil.artId === 'repulsor') red.begin(which);
+  else if (sigil.artId === 'nullpoint') nullOrb.begin(); // a saved two-hand sign for Purple
   else caster.cast(sigil.artId, hand);
 };
+
+// Hand-sign combination: two base signs held together (one per hand) unlock the result and save the two-hand pose as a custom sign.
+recognizer.onCombine = (rec, L, R, two) => {
+  if (!unlocks.isLocked(rec.result) || !two) return;
+  const word = UNLOCK_NAMES[rec.result][0];
+  recorder.addSigil(recorder.makeTwoHandSigil(two, rec.result, word[0] + word.slice(1).toLowerCase() + ' Sign')); // saved with the existing custom signs
+  lastCast = 'Combined ' + ARTS[rec.a].name + ' + ' + ARTS[rec.b].name;
+  unlocks.unlock(rec.result); // popup
+};
+const say = id => { lastCast = 'Locked: ' + lockedHint(id); };
 
 const panel = new Panel();
 panel.mesh.position.set(-0.55, 1.2, -0.7);
 panel.mesh.rotation.y = 0.6;
 scene.add(panel.mesh);
 [['Rec Right', 'right', 10, 370], ['Rec Left', 'left', 176, 370], ['Rec Two', 'two', 342, 370]].forEach(([label, mode, x, y]) =>
-  panel.addButton({ label, x, y, w: 160, h: 70, onPress: () => !recorder.active && recorder.start(mode, ART_IDS[nextArt]) }));
+  panel.addButton({ label, x, y, w: 160, h: 70, onPress: () => !recorder.active && recorder.start(mode, curArt()) }));
 panel.addButton({ label: 'RESET', x: 10, y: 290, w: 118, h: 70, onPress: () => director.reset() });
 panel.addButton({ label: 'Sanctum', x: 136, y: 290, w: 118, h: 70, onPress: () => sanctum.activate(presetIdx, ruleIdx) });
 panel.addButton({ label: 'Look', x: 262, y: 290, w: 118, h: 70, onPress: () => { presetIdx = (presetIdx + 1) % PRESETS.length; } });
 panel.addButton({ label: 'Rule', x: 388, y: 290, w: 114, h: 70, onPress: () => { ruleIdx = (ruleIdx + 1) % RULES.length; } });
-panel.addButton({ label: 'Next Art', x: 10, y: 450, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % ART_IDS.length; } });
+panel.addButton({ label: 'Next Art', x: 10, y: 450, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % artChoices().length; } });
 panel.addButton({ label: 'Clear Custom', x: 262, y: 450, w: 240, h: 70, onPress: () => recorder.clearCustom() });
 
 // Gravity Well fallbacks: start charging without the hand sign, and launch without a throw.
-panel.addButton({ label: 'Well: Charge', x: 10, y: 610, w: 240, h: 70, onPress: () => well.begin('right') });
+panel.addButton({ label: 'Well: Charge', x: 10, y: 610, w: 240, h: 70, onPress: () => (unlocks.has('well') ? well.begin('right') : say('well')) });
 panel.addButton({ label: 'Well: Launch', x: 262, y: 610, w: 240, h: 70, onPress: () => well.launchNow() });
 
-panel.addButton({ label: 'Red: Charge', x: 10, y: 690, w: 240, h: 70, onPress: () => red.begin('left') });
+panel.addButton({ label: 'Red: Charge', x: 10, y: 690, w: 240, h: 70, onPress: () => (unlocks.has('repulsor') ? red.begin('left') : say('repulsor')) });
 panel.addButton({ label: 'Red: Launch', x: 262, y: 690, w: 240, h: 70, onPress: () => red.launchNow() });
 
-panel.addButton({ label: 'Null: Merge', x: 10, y: 770, w: 240, h: 70, onPress: () => nullOrb.begin() });
+panel.addButton({ label: 'Null: Merge', x: 10, y: 770, w: 240, h: 70, onPress: () => (unlocks.has('nullpoint') ? nullOrb.begin() : say('nullpoint')) });
 panel.addButton({ label: 'Null: Launch', x: 262, y: 770, w: 240, h: 70, onPress: () => nullOrb.launchNow() });
+
+panel.addButton({ label: 'Reset Progress', x: 10, y: 850, w: 492, h: 70, onPress: () => { unlocks.reset(); recorder.clearCustom(); lastCast = 'Progress reset: only Bolt, Pull, Repel'; spellbook.refresh(); } });
 
 // Forge: name / rebind the most recent custom Sigil.
 const ADJ = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron'];
@@ -145,7 +193,7 @@ panel.addButton({ label: 'Rename Last', x: 10, y: 530, w: 240, h: 70, onPress: (
 } });
 panel.addButton({ label: 'Rebind Last', x: 262, y: 530, w: 240, h: 70, onPress: () => {
   const s = lastCustom(); if (!s) return;
-  s.artId = ART_IDS[(ART_IDS.indexOf(s.artId) + 1) % ART_IDS.length];
+  const ch = artChoices(); s.artId = ch[(ch.indexOf(s.artId) + 1) % ch.length];
   saveCustom(recognizer.sigils); spellbook.refresh();
 } });
 
@@ -161,10 +209,11 @@ function updateHud(dt, R) {
   panel.setLines([
     'SpellForge',
     rec,
-    `${lastCast} | ${[['Blue', well], ['Red', red], ['Null', nullOrb]].filter(([, o]) => o.status !== 'ready').map(([n, o]) => `${n} ${o.status}`).join(' | ') || 'ready'}`,
+    recognizer.combo ? `Combining ${ARTS[recognizer.combo.rec.a].name} + ${ARTS[recognizer.combo.rec.b].name}... ${Math.round(recognizer.combo.pct * 100)}%`
+      : `${lastCast} | ${[['Blue', well], ['Red', red], ['Null', nullOrb]].filter(([, o]) => o.status !== 'ready').map(([n, o]) => `${n} ${o.status}`).join(' | ') || 'ready'}`,
     dbg ? `Best: ${dbg.sg.name} ${dbg.ratio.toFixed(2)} (<1 fires)` : 'Best: no hands',
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
-    `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
+    `Next record art: ${ARTS[curArt()].name} | Unlocked: ${[...new Set(recognizer.sigils.map(x => x.artId))].filter(id => unlocks.has(id)).length}/${new Set(recognizer.sigils.map(x => x.artId)).size}`,
     `Sanctum: ${PRESETS[presetIdx].name} + ${RULES[ruleIdx].name}`,
     `[${QUALITY_NAME}] ${perf.text}`,
     (c => c ? `Last custom: ${c.name} -> ${ARTS[c.artId]?.name}` : 'Last custom: none')(lastCustom()),
@@ -219,4 +268,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { interact, loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook
+window.spellforge = { unlocks, interact, loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook
