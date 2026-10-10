@@ -65,21 +65,36 @@ export class AssetManager {
     (this.manifest.decor || []).forEach((d, i) => {
       const raw = this.decorRaw[i];
       if (!raw || !d.points?.length) return;
-      const wrap = this.prep(raw, { ...d, outline: false });
-      wrap.updateMatrixWorld(true);
-      wrap.traverse(o => {
-        if (!o.isMesh) return;
-        const im = new THREE.InstancedMesh(o.geometry, o.material, d.points.length);
-        const m = new THREE.Matrix4(), place = new THREE.Matrix4(), q = new THREE.Quaternion();
-        d.points.forEach(([x, z, rot], k) => {
-          q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(rot || 0));
-          place.compose(new THREE.Vector3(x, 0, z), q, new THREE.Vector3(1, 1, 1));
-          im.setMatrixAt(k, m.multiplyMatrices(place, o.matrixWorld));
-        });
-        im.frustumCulled = false;
-        scene.add(im); n++;
-      });
+      n += this.instance(scene, raw, d.points, d);
     });
     if (n) console.log(`[assets] decor: ${n} instanced mesh(es)`);
+  }
+
+  // Instance a manifest slot at code-computed points [x, z, rotDeg, scale, y]; no-op if the slot has no GLB.
+  scatter(scene, name, points, defaults = {}) {
+    const raw = this.raw[name];
+    if (!raw || !points.length) return 0;
+    const n = this.instance(scene, raw, points, { ...defaults, ...this.manifest.slots[name] });
+    console.log(`[assets] scattered ${points.length} x ${name}`);
+    return n;
+  }
+
+  instance(scene, raw, points, cfg) {
+    const wrap = this.prep(raw, { ...cfg, outline: false });
+    wrap.updateMatrixWorld(true);
+    let n = 0;
+    wrap.traverse(o => {
+      if (!o.isMesh) return;
+      const im = new THREE.InstancedMesh(o.geometry, o.material, points.length);
+      const m = new THREE.Matrix4(), place = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      points.forEach(([x, z, rot, s = 1, y = 0], k) => {
+        q.setFromAxisAngle(up, THREE.MathUtils.degToRad(rot || 0));
+        place.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s));
+        im.setMatrixAt(k, m.multiplyMatrices(place, o.matrixWorld));
+      });
+      im.frustumCulled = false;
+      scene.add(im); n++;
+    });
+    return n;
   }
 }

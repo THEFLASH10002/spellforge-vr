@@ -3,7 +3,9 @@
     "machiya": { "file": "models/machiya.glb", "fitHeight": 4.5 },
     "pagoda": { "file": "models/pagoda.glb", "fitHeight": 7 },
     "torii": { "file": "models/torii.glb", "fitHeight": 4.6 },
-    "lantern": { "file": "models/lantern.glb", "fitHeight": 0.75, "y": 1.55, "outline": false }
+    "lantern": { "file": "models/lantern.glb", "fitHeight": 0.75, "y": 1.55, "outline": false },
+    "village": { "file": "models/village.glb", "fitHeight": 4 },
+    "tree": { "file": "models/tree.glb", "fitHeight": 6 }
   },
   "decor": []
 }

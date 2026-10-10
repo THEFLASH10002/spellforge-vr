@@ -20,6 +20,8 @@ import { toon, cobbleTexture } from './render/Toon.js';
 import { Sky } from './render/Sky.js';
 import { fx } from './vfx/Effects.js';
 import { AssetManager } from './assets/AssetManager.js';
+import { buildTerrain, buildTrainingGround, terrainHeight, onPath, PADS, FLAT } from './world/Terrain.js';
+import { Grass } from './world/Grass.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -47,11 +49,9 @@ fx.init(scene);
 
 const physics = await PhysicsWorld.create();
 
-const floor = new THREE.Mesh(new THREE.BoxGeometry(40, 0.2, 40),
-  toon(0x8a92b8, { map: cobbleTexture(24) }));
-floor.position.y = -0.1;
-scene.add(floor);
-physics.addStaticBox(floor, 20, 0.1, 20);
+const floor = buildTerrain(physics, scene); // (the Sanctum tints this material)
+buildTrainingGround(scene);
+const grass = new Grass(scene, QUALITY.grass);
 
 const hands = setupHands(renderer, scene);
 const handBy = side => hands.find(h => h.userData.handedness === side);
@@ -60,7 +60,21 @@ const handBy = side => hands.find(h => h.userData.handedness === side);
 const assets = await AssetManager.load();
 const district = buildDistrict(physics, scene, assets);
 assets.buildDecor(scene);
-const puppets = [[-1.6, -3.5], [0.2, -4], [1.8, -3.5], [2, -5.2]].map(([x, z], i) => new Puppet(physics, scene, x, z, i));
+
+// Village homes on the four side/back pads (static scenery, facing the arena) and sakura trees on the slopes.
+const village = PADS.slice(2).map(p => [p.x, p.z, THREE.MathUtils.radToDeg(Math.atan2(-p.x, -p.z)), 1, terrainHeight(p.x, p.z)]);
+assets.scatter(scene, 'village', village, { fitHeight: 4 });
+let seed = 7;
+const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+const trees = [];
+while (trees.length < QUALITY.trees) {
+  const x = (rand() - 0.5) * 90, z = (rand() - 0.5) * 90, r = Math.hypot(x, z);
+  if (r < FLAT + 2 || r > 44 || onPath(x, z) || PADS.some(p => Math.hypot(x - p.x, z - p.z) < p.r + 3)) continue;
+  trees.push([x, z, rand() * 360, 0.8 + rand() * 0.5, terrainHeight(x, z)]);
+}
+assets.scatter(scene, 'tree', trees, { fitHeight: 6 });
+
+const puppets = [[-4, -5], [-1, -6.5], [2.5, -5.5], [5.5, -2.5]].map(([x, z], i) => new Puppet(physics, scene, x, z, i));
 
 const recognizer = new Recognizer();
 recognizer.sigils = [...BUILTINS, ...loadCustom()];
@@ -153,6 +167,7 @@ renderer.setAnimationLoop(() => {
   if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
   caster.update(dt, headPos);
   fx.update(dt);
+  grass.update(clock.elapsedTime);
   district.update(dt * sanctum.timeScale);
   sanctum.update(dt);
   for (const p of puppets) p.update(dt, clock.elapsedTime);

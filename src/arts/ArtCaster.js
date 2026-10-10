@@ -22,7 +22,7 @@ export class ArtCaster {
     m.position.copy(hand.tip).addScaledVector(hand.fwd, 0.1);
     this.scene.add(m);
     const tag = { isProjectile: true, mesh: m };
-    tag.body = this.physics.addDynamicSphere(m, 0.05, hand.fwd.clone().multiplyScalar(14), tag);
+    tag.body = this.physics.addDynamicSphere(m, 0.05, hand.fwd.clone().multiplyScalar(26), tag);
     this.live.push({ mesh: m, tag, ttl: 6, trail: new Trail(this.scene, art.color), fade: 0 });
   }
 

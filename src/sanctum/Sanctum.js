@@ -7,7 +7,8 @@ const LAMP_BASE = 0xffb868; // warm street-lantern glow before the Sanctum recol
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const smooth = x => x * x * (3 - 2 * x);
-const LANTERNS = [[-5.6, -2], [-5.6, -4.8], [5.8, -2], [5.8, -4.8], [-2.8, -1.5], [2.8, -1.5], [-3.6, -7.2], [3.6, -7.2], [-8.5, -5], [8.5, -5]];
+// Ring of lanterns around the training ground (flat zone, radius ~9.6 m).
+const LANTERNS = Array.from({ length: 10 }, (_, i) => [Math.cos((i / 10) * Math.PI * 2 + 0.3) * 9.6, Math.sin((i / 10) * Math.PI * 2 + 0.3) * 9.6]);
 
 // Personal domain: tweens sky/fog/lights/floor, ignites lanterns, collapses remaining puppets,
 // then runs one gameplay rule (low gravity | slow time | pulse shockwaves) until reset.
@@ -37,12 +38,13 @@ export class Sanctum {
       // A hanging-lantern GLB replaces the lamp box and hangs from a taller pole; the halo still recolors.
       const skin = assets?.get('lantern', { fitHeight: 0.75, y: 1.55, outline: false });
       if (skin) {
-        const side = x > 0 ? -1 : 1, lx = x + side * 0.5; // arm reaches toward the street; lantern hangs from its tip
+        const r = Math.hypot(x, z), dx = -x / r, dz = -z / r; // arm reaches toward the arena center; lantern hangs from its tip
+        const lx = x + dx * 0.5, lz = z + dz * 0.5;
         p.scale.y = 2.3 / 1.8; p.position.y = 1.15;
         const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6), pole);
-        arm.rotation.z = Math.PI / 2; arm.position.set(x + side * 0.25, 2.3, z);
-        skin.position.set(lx, 0, z);
-        lamp.position.set(lx, 1.95, z); halo.position.copy(lamp.position); lamp.visible = false;
+        arm.rotation.set(0, Math.atan2(-dz, dx), Math.PI / 2); arm.position.set(x + dx * 0.25, 2.3, z + dz * 0.25);
+        skin.position.set(lx, 0, lz);
+        lamp.position.set(lx, 1.95, lz); halo.position.copy(lamp.position); lamp.visible = false;
         scene.add(skin, arm);
       }
       return lamp;

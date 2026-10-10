@@ -46,6 +46,7 @@ export class PhysicsWorld {
     const body = this.world.createRigidBody(
       this.R.RigidBodyDesc.dynamic().setTranslation(p.x, p.y, p.z).setCcdEnabled(true)
         .setLinvel(vel.x, vel.y, vel.z));
+    body.setGravityScale(0.15, true); // bolts fly nearly straight so they reach the hillside town
     const c = this.world.createCollider(this.R.ColliderDesc.ball(r).setRestitution(0.3).setDensity(4), body);
     if (tag) this.tag(c, tag);
     this.synced.push({ mesh, body });
