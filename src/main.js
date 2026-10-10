@@ -27,6 +27,7 @@ import { GravityWell, WELL, RED, RED_VARIANT } from './arts/GravityWell.js';
 import { WellMood, MOOD } from './vfx/WellMood.js';
 import { NullOrb, NULL } from './arts/NullOrb.js';
 import { Spellbook } from './ui/Spellbook.js';
+import { Locomotion } from './world/Locomotion.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -83,7 +84,7 @@ caster.env = env;
 const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, renderer, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
-const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); } });
+const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); loco.moveTo(0, 0); placeBook = true; } });
 let lastCast = '-';
 let nextArt = 0;
 const well = new GravityWell({ scene, physics, env, targets });            // Blue: pulls
@@ -93,6 +94,8 @@ const nullOrb = new NullOrb({ scene, physics, env, targets, assets, grass, well,
 const spellbook = new Spellbook({ scene, assets, getSigils: () => recognizer.sigils }); // every saved Sigil gets a page
 recorder.onSaved = s => spellbook.discover(s);
 recorder.onChanged = () => spellbook.refresh();
+// Locomotion: pinch to teleport (hands), thumbstick (controllers), WASD (desktop). The panel + spellbook travel with you.
+const loco = new Locomotion({ renderer, scene, camera, onMove: d => { panel.mesh.position.add(d); spellbook.root.position.add(d); spellbook.baseY += d.y; } });
 let placeBook = false;
 renderer.xr.addEventListener('sessionstart', () => { placeBook = true; });
 const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red, nullOrb] });
@@ -186,13 +189,17 @@ renderer.setAnimationLoop(() => {
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
   if (recorder.active) recorder.update(dt, L, R, headInv); else {
     // A hand that is holding an orb is busy; the other hand can still sign (so you can hold Blue and Red together).
-    const busy = h => nullOrb.active || (well.active && well.which === h) || (red.active && red.which === h);
+    const holding = h => nullOrb.active || (well.active && well.which === h) || (red.active && red.which === h);
+    const busy = h => holding(h) || loco.pinching[h]; // a pinching hand is aiming a teleport, not signing
     recognizer.update(dt, busy('left') ? null : L, busy('right') ? null : R, headInv);
   }
   well.update(dt, headPos, headQ, L, R);
   red.update(dt, headPos, headQ, L, R);
   nullOrb.update(dt, headPos, headQ, L, R);
-  if (placeBook && renderer.xr.isPresenting) { spellbook.place(headPos, headCam.getWorldDirection(new THREE.Vector3())); placeBook = false; }
+  loco.update(dt, headPos, headQ, L, R, h => (well.active && well.which === h) || (red.active && red.which === h) || nullOrb.active);
+  if (placeBook && renderer.xr.isPresenting && headPos.y > 0.4) { // wait for a valid head pose, then put the book on your left
+    spellbook.place(headPos, new THREE.Vector3(0, 0, -1).applyQuaternion(headQ)); placeBook = false;
+  }
   spellbook.update(dt, clock.elapsedTime); spellbook.poke([L?.tip, R?.tip], performance.now());
   caster.update(dt, headPos);
   fx.update(dt);
@@ -206,4 +213,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook
+window.spellforge = { loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook

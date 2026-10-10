@@ -214,8 +214,8 @@ export class Spellbook {
 
   // Place the book in front of / slightly right of the player (call at session start).
   place(head, fwd) {
-    const f = new THREE.Vector3(fwd.x, 0, fwd.z).normalize(), right = new THREE.Vector3(-f.z, 0, f.x).multiplyScalar(-1);
-    const p = head.clone().addScaledVector(f, 0.85).addScaledVector(right, 0.38); p.y = head.y - 0.4;
+    const f = new THREE.Vector3(fwd.x, 0, fwd.z).normalize(), left = new THREE.Vector3(f.z, 0, -f.x); // left = up x forward
+    const p = head.clone().addScaledVector(f, 0.1).addScaledVector(left, 0.75); p.y = head.y - 0.45; // beside you on your left, clear of the control panel
     this.root.position.copy(p); this.baseY = p.y;
     this.root.rotation.y = Math.atan2(head.x - p.x, head.z - p.z);
   }
