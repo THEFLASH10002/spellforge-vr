@@ -140,7 +140,7 @@ export class Spellbook {
     this.flip = null; this.open = null; this.mixer = null; this.timeScale = 0.6;
 
     this.root = new THREE.Group();
-    this.root.position.set(0.45, 1.15, -0.8); this.root.rotation.y = -0.45;
+    this.root.position.set(-0.75, 1.15, -0.1); this.root.rotation.y = Math.atan2(0.75, 0.1); // starts beside you on the left (re-placed when VR starts)
     scene.add(this.root);
     this.baseY = this.root.position.y;
 
@@ -215,7 +215,8 @@ export class Spellbook {
   // Place the book in front of / slightly right of the player (call at session start).
   place(head, fwd) {
     const f = new THREE.Vector3(fwd.x, 0, fwd.z).normalize(), left = new THREE.Vector3(f.z, 0, -f.x); // left = up x forward
-    const p = head.clone().addScaledVector(f, 0.1).addScaledVector(left, 0.75); p.y = head.y - 0.45; // beside you on your left, clear of the control panel
+    const eye = Math.max(head.y, 1.2); // in a 'local' (not floor) space the head sits near y = 0, so never sink below chest height
+    const p = head.clone().addScaledVector(f, 0.1).addScaledVector(left, 0.75); p.y = eye - 0.45; // beside you on your left, clear of the control panel
     this.root.position.copy(p); this.baseY = p.y;
     this.root.rotation.y = Math.atan2(head.x - p.x, head.z - p.z);
   }
@@ -232,8 +233,13 @@ export class Spellbook {
     }
   }
 
-  update(dt, t) {
+  // head/fwd (optional): if the book ever ends up inside you (< 0.45 m) or far away (> 3.5 m), put it back beside you.
+  update(dt, t, head, fwd) {
     this.t += dt;
+    if (head && fwd) {
+      const d = Math.hypot(this.root.position.x - head.x, this.root.position.z - head.z);
+      if ((d < 0.45 || d > 3.5) && t - (this.lastPlace ?? -9) > 1) { this.place(head, fwd); this.lastPlace = t; }
+    }
     // hover
     this.root.position.y = this.baseY + Math.sin(t * 1.3) * 0.02;
     this.root.rotation.z = Math.sin(t * 0.9) * 0.03;

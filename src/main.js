@@ -147,7 +147,7 @@ panel.addButton({ label: 'Rebind Last', x: 262, y: 530, w: 240, h: 70, onPress: 
   saveCustom(recognizer.sigils); spellbook.refresh();
 } });
 
-const headQ = new THREE.Quaternion(), headPos = new THREE.Vector3();
+const headQ = new THREE.Quaternion(), headPos = new THREE.Vector3(), headFwd = new THREE.Vector3(0, 0, -1);
 let hudT = 0;
 function updateHud(dt, R) {
   hudT -= dt;
@@ -197,10 +197,9 @@ renderer.setAnimationLoop(() => {
   red.update(dt, headPos, headQ, L, R);
   nullOrb.update(dt, headPos, headQ, L, R);
   loco.update(dt, headPos, headQ, L, R, h => (well.active && well.which === h) || (red.active && red.which === h) || nullOrb.active);
-  if (placeBook && renderer.xr.isPresenting && headPos.y > 0.4) { // wait for a valid head pose, then put the book on your left
-    spellbook.place(headPos, new THREE.Vector3(0, 0, -1).applyQuaternion(headQ)); placeBook = false;
-  }
-  spellbook.update(dt, clock.elapsedTime); spellbook.poke([L?.tip, R?.tip], performance.now());
+  headFwd.set(0, 0, -1).applyQuaternion(headQ);
+  if (placeBook && (renderer.xr.isPresenting || !renderer.xr.enabled)) { spellbook.place(headPos, headFwd); placeBook = false; } // beside you on the left
+  spellbook.update(dt, clock.elapsedTime, headPos, headFwd); spellbook.poke([L?.tip, R?.tip], performance.now());
   caster.update(dt, headPos);
   fx.update(dt);
   env.update(dt, clock.elapsedTime, headPos);
