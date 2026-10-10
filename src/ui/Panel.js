@@ -27,7 +27,7 @@ export class Panel {
     this.lines.forEach((t, i) => c.fillText(t, 14, 34 + i * 32));
     for (const b of this.buttons) {
       c.fillStyle = '#3b4cca'; c.fillRect(b.x, b.y, b.w, b.h);
-      c.fillStyle = '#fff'; c.font = '26px sans-serif';
+      c.fillStyle = '#fff'; c.font = '22px sans-serif';
       c.fillText(b.label, b.x + 12, b.y + b.h / 2 + 9);
     }
     this.tex.needsUpdate = true;

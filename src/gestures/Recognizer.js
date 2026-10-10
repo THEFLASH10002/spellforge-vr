@@ -38,7 +38,7 @@ export class Recognizer {
     const key = hit.sg.id + '|' + hit.hand;
     if (key !== this.key) { this.key = key; this.hold = 0; }
     this.hold += dt;
-    if (this.hold >= this.holdTime && this.armed && !(this.cool[hit.sg.id] > 0)) {
+    if (this.hold >= (hit.sg.hold ?? this.holdTime) && this.armed && !(this.cool[hit.sg.id] > 0)) {
       this.armed = false;
       this.cool[hit.sg.id] = hit.sg.cooldown ?? this.cooldown;
       const castHand = hit.hand === 'left' ? L : R;

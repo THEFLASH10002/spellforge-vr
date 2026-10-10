@@ -12,6 +12,8 @@ import { Panel } from './ui/Panel.js';
 import { buildDistrict } from './destruction/District.js';
 import { Puppet } from './enemies/Puppet.js';
 import { Director } from './demo/Director.js';
+import { Sanctum } from './sanctum/Sanctum.js';
+import { PRESETS, RULES } from './sanctum/presets.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(1);
@@ -28,7 +30,8 @@ scene.background = new THREE.Color(0x0b0d1a);
 scene.fog = new THREE.Fog(0x0b0d1a, 8, 40);
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 100);
 camera.position.set(0, 1.6, 0);
-scene.add(new THREE.HemisphereLight(0x8899ff, 0x222233, 1.6));
+const hemi = new THREE.HemisphereLight(0x8899ff, 0x222233, 1.6);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffddaa, 1.2);
 sun.position.set(3, 6, 2);
 scene.add(sun);
@@ -61,12 +64,15 @@ const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
 caster.destructibles = targets;
-const director = new Director({ targets, caster });
+const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets });
+let presetIdx = 0, ruleIdx = 0;
+const director = new Director({ targets, caster, onReset: () => sanctum.reset() });
 let lastCast = '-';
 let nextArt = 0;
 recognizer.onCast = (sigil, hand) => {
   lastCast = `${sigil.name} (${sigil.artId})`;
-  caster.cast(sigil.artId, hand);
+  if (sigil.artId === 'sanctum') sanctum.activate(presetIdx, ruleIdx);
+  else caster.cast(sigil.artId, hand);
 };
 
 const panel = new Panel();
@@ -75,7 +81,10 @@ panel.mesh.rotation.y = 0.6;
 scene.add(panel.mesh);
 [['Rec Right', 'right', 10, 330], ['Rec Left', 'left', 176, 330], ['Rec Two', 'two', 342, 330]].forEach(([label, mode, x, y]) =>
   panel.addButton({ label, x, y, w: 160, h: 70, onPress: () => !recorder.active && recorder.start(mode, ART_IDS[nextArt]) }));
-panel.addButton({ label: 'RESET', x: 10, y: 250, w: 240, h: 70, onPress: () => director.reset() });
+panel.addButton({ label: 'RESET', x: 10, y: 250, w: 118, h: 70, onPress: () => director.reset() });
+panel.addButton({ label: 'Sanctum', x: 136, y: 250, w: 118, h: 70, onPress: () => sanctum.activate(presetIdx, ruleIdx) });
+panel.addButton({ label: 'Look', x: 262, y: 250, w: 118, h: 70, onPress: () => { presetIdx = (presetIdx + 1) % PRESETS.length; } });
+panel.addButton({ label: 'Rule', x: 388, y: 250, w: 114, h: 70, onPress: () => { ruleIdx = (ruleIdx + 1) % RULES.length; } });
 panel.addButton({ label: 'Next Art', x: 10, y: 410, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % ART_IDS.length; } });
 panel.addButton({ label: 'Clear Custom', x: 262, y: 410, w: 240, h: 70, onPress: () => recorder.clearCustom() });
 
@@ -95,6 +104,7 @@ function updateHud(dt, R) {
     dbg ? `Best: ${dbg.sg.name} ${dbg.ratio.toFixed(2)} (<1 fires)` : 'Best: no hands',
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
     `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
+    `Sanctum: ${PRESETS[presetIdx].name} + ${RULES[ruleIdx].name}`,
   ]);
   panel.draw();
 }
@@ -108,14 +118,15 @@ addEventListener('resize', () => {
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = clock.getDelta();
-  physics.step(dt);
+  physics.step(dt * sanctum.timeScale);
   (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldQuaternion(headQ);
   const headInv = headQ.clone().invert();
   const lh = handBy('left'), rh = handBy('right');
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
   if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
   caster.update(dt);
-  district.update(dt);
+  district.update(dt * sanctum.timeScale);
+  sanctum.update(dt);
   for (const p of puppets) p.update(dt, clock.elapsedTime);
   panel.poke([L?.tip, R?.tip], performance.now());
   updateHud(dt, R);
