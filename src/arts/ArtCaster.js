@@ -33,7 +33,7 @@ export class ArtCaster {
     const to = new THREE.Vector3();
     for (const d of this.destructibles) {
       if (d.broken) continue;
-      to.copy(d.mesh.position).sub(hand.wrist);
+      to.copy(d.center || d.mesh.position).sub(hand.wrist);
       const dist = to.length();
       if (dist < 6 && to.normalize().dot(dir) > 0.85) d.shatter(hand.wrist, dir, 10);
     }
@@ -45,6 +45,11 @@ export class ArtCaster {
       body.wakeUp();
       body.applyImpulse({ x: dir.x * k, y: dir.y * k + 0.5 * k, z: dir.z * k }, true);
     }
+  }
+
+  clear() {
+    for (const e of this.live) { if (e.fx) e.mesh.removeFromParent(); else this.physics.remove(e.mesh); }
+    this.live = [];
   }
 
   update(dt) {

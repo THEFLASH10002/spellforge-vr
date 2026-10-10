@@ -29,7 +29,22 @@ export class Destructible {
     const R = physics.R, p = geometry.parameters;
     const desc = isCyl ? R.ColliderDesc.cylinder(p.height / 2, p.radiusTop)
       : R.ColliderDesc.cuboid(p.width / 2, p.height / 2, p.depth / 2);
+    this.makeDesc = () => (isCyl ? R.ColliderDesc.cylinder(p.height / 2, p.radiusTop)
+      : R.ColliderDesc.cuboid(p.width / 2, p.height / 2, p.depth / 2));
+    this.position = position.clone();
+    for (const f of this.frags) f.userData.home = f.position.clone();
     this.collider = physics.addFixedCollider(desc, position, this);
+  }
+
+  // Restore the intact piece; fragment meshes are reused (no re-fracture hitch).
+  reset() {
+    for (const e of this.live) this.physics.remove(e.mesh);
+    this.live = []; this.pending = [];
+    if (!this.broken) return;
+    this.broken = false;
+    for (const f of this.frags) { f.position.copy(f.userData.home); f.quaternion.identity(); }
+    this.scene.add(this.mesh);
+    this.collider = this.physics.addFixedCollider(this.makeDesc(), this.position, this);
   }
 
   onHit(other) {

@@ -10,6 +10,8 @@ import { ArtCaster } from './arts/ArtCaster.js';
 import { ART_IDS, ARTS } from './arts/ArtRegistry.js';
 import { Panel } from './ui/Panel.js';
 import { buildDistrict } from './destruction/District.js';
+import { Puppet } from './enemies/Puppet.js';
+import { Director } from './demo/Director.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(1);
@@ -49,22 +51,17 @@ physics.addDynamicBox(box, 0.15, 0.15, 0.15);
 const hands = setupHands(renderer, scene);
 const handBy = side => hands.find(h => h.userData.handedness === side);
 
-// Placeholder targets for the Arts (replaced by destructible buildings later).
-const targetMat = new THREE.MeshLambertMaterial({ color: 0xd9b36c });
-for (let i = 0; i < 6; i++) {
-  const b = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), targetMat);
-  b.position.set(((i % 3) - 1) * 0.5, 0.2 + Math.floor(i / 3) * 0.4, -3);
-  scene.add(b);
-  physics.addDynamicBox(b, 0.2, 0.2, 0.2);
-}
 
 const district = buildDistrict(physics, scene);
+const puppets = [[-1.6, -3.5], [0.2, -4], [1.8, -3.5], [2, -5.2]].map(([x, z], i) => new Puppet(physics, scene, x, z, i));
 
 const recognizer = new Recognizer();
 recognizer.sigils = [...BUILTINS, ...loadCustom()];
 const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
-caster.destructibles = district.pieces;
+const targets = [...district.pieces, ...puppets];
+caster.destructibles = targets;
+const director = new Director({ targets, caster });
 let lastCast = '-';
 let nextArt = 0;
 recognizer.onCast = (sigil, hand) => {
@@ -78,6 +75,7 @@ panel.mesh.rotation.y = 0.6;
 scene.add(panel.mesh);
 [['Rec Right', 'right', 10, 330], ['Rec Left', 'left', 176, 330], ['Rec Two', 'two', 342, 330]].forEach(([label, mode, x, y]) =>
   panel.addButton({ label, x, y, w: 160, h: 70, onPress: () => !recorder.active && recorder.start(mode, ART_IDS[nextArt]) }));
+panel.addButton({ label: 'RESET', x: 10, y: 250, w: 240, h: 70, onPress: () => director.reset() });
 panel.addButton({ label: 'Next Art', x: 10, y: 410, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % ART_IDS.length; } });
 panel.addButton({ label: 'Clear Custom', x: 262, y: 410, w: 240, h: 70, onPress: () => recorder.clearCustom() });
 
@@ -118,6 +116,7 @@ renderer.setAnimationLoop(() => {
   if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
   caster.update(dt);
   district.update(dt);
+  for (const p of puppets) p.update(dt, clock.elapsedTime);
   panel.poke([L?.tip, R?.tip], performance.now());
   updateHud(dt, R);
   renderer.render(scene, camera);
