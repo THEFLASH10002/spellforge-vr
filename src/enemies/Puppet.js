@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { toon, addOutline } from '../render/Toon.js';
 
 // Segmented wooden kugutsu puppet. Alive: a swaying group of box parts with one fixed hit-collider.
 // On hit: each part gets a dynamic Rapier body, joined by spherical joints (ragdoll).
@@ -28,9 +29,10 @@ export class Puppet {
     this.parts = {};
     for (const d of PARTS) {
       const m = new THREE.Mesh(new THREE.BoxGeometry(d.h[0] * 2, d.h[1] * 2, d.h[2] * 2),
-        new THREE.MeshLambertMaterial({ color: d.color }));
+        toon(d.color));
       m.position.set(...d.c);
       this.group.add(m);
+      addOutline(m, 0.012);
       this.parts[d.n] = { def: d, mesh: m };
     }
     const eyes = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.03, 0.01), new THREE.MeshBasicMaterial({ color: 0xc0281e }));

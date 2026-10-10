@@ -16,6 +16,8 @@ import { Sanctum } from './sanctum/Sanctum.js';
 import { PRESETS, RULES } from './sanctum/presets.js';
 import { QUALITY, QUALITY_NAME } from './config/Quality.js';
 import { Perf } from './debug/Perf.js';
+import { toon, cobbleTexture } from './render/Toon.js';
+import { Sky } from './render/Sky.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -30,29 +32,23 @@ document.body.appendChild(VRButton.createButton(renderer, {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0d1a);
-scene.fog = new THREE.Fog(0x0b0d1a, 8, 40);
-const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 100);
+scene.fog = new THREE.Fog(0x3a2d5c, 12, 60); // matches the sky horizon
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
 camera.position.set(0, 1.6, 0);
-const hemi = new THREE.HemisphereLight(0x8899ff, 0x222233, 1.6);
+const hemi = new THREE.HemisphereLight(0xa8b0ff, 0x3a2f4a, 1.5);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffddaa, 1.2);
-sun.position.set(3, 6, 2);
+const sun = new THREE.DirectionalLight(0xc4d0ff, 1.5); // cool moonlight key from behind-left so facades stay readable
+sun.position.set(-3, 6, 4);
 scene.add(sun);
+const sky = new Sky(scene);
 
 const physics = await PhysicsWorld.create();
 
 const floor = new THREE.Mesh(new THREE.BoxGeometry(40, 0.2, 40),
-  new THREE.MeshLambertMaterial({ color: 0x2a2f45 }));
+  toon(0x8a92b8, { map: cobbleTexture(24) }));
 floor.position.y = -0.1;
 scene.add(floor);
 physics.addStaticBox(floor, 20, 0.1, 20);
-
-// Hour-4 gate: one box falls in front of the player.
-const box = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3),
-  new THREE.MeshLambertMaterial({ color: 0xe0503a }));
-box.position.set(0, 2.5, -1.2);
-scene.add(box);
-physics.addDynamicBox(box, 0.15, 0.15, 0.15);
 
 const hands = setupHands(renderer, scene);
 const handBy = side => hands.find(h => h.userData.handedness === side);
@@ -67,7 +63,7 @@ const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
 caster.destructibles = targets;
-const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, stars: QUALITY.stars });
+const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
 const director = new Director({ targets, caster, onReset: () => sanctum.reset() });

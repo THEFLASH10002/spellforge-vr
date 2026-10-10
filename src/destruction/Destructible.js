@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DestructibleMesh, FractureOptions } from '@dgreenheck/three-pinata';
+import { toon, addOutline } from '../render/Toon.js';
 
 // A pre-fractured piece of scenery. The intact mesh (with a fixed collider) is shown until
 // shatter(); then it is hidden and its fragments become dynamic Rapier bodies.
@@ -12,8 +13,8 @@ export class Destructible {
     this.live = [];       // { mesh, ttl }
     this.pending = [];    // { t, fn }
 
-    const outer = new THREE.MeshLambertMaterial({ color });
-    const inner = new THREE.MeshLambertMaterial({ color: innerColor });
+    const outer = toon(color);
+    const inner = toon(innerColor);
     this.mesh = new DestructibleMesh(geometry, outer, inner);
     this.mesh.position.copy(position);
     scene.add(this.mesh);
@@ -26,6 +27,7 @@ export class Destructible {
       voronoiOptions: { mode: mode || (isCyl ? '3D' : '2.5D') },
     }));
 
+    addOutline(this.mesh, 0.03);
     const R = physics.R, p = geometry.parameters;
     const desc = isCyl ? R.ColliderDesc.cylinder(p.height / 2, p.radiusTop)
       : R.ColliderDesc.cuboid(p.width / 2, p.height / 2, p.depth / 2);

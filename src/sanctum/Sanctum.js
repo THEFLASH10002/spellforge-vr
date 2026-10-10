@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { PRESETS, RULES } from './presets.js';
+import { toon, glowTexture } from '../render/Toon.js';
+
+const LAMP_BASE = 0xffb868; // warm street-lantern glow before the Sanctum recolors it
 
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const smooth = x => x * x * (3 - 2 * x);
@@ -8,21 +11,28 @@ const LANTERNS = [[-5.6, -2], [-5.6, -5], [-5.6, -8], [-5.6, -11], [5.8, -2], [5
 // Personal domain: tweens sky/fog/lights/floor, ignites lanterns, collapses remaining puppets,
 // then runs one gameplay rule (low gravity | slow time | pulse shockwaves) until reset.
 export class Sanctum {
-  constructor({ scene, physics, floor, hemi, sun, puppets, stars = 700 }) {
-    Object.assign(this, { scene, physics, floor, hemi, sun, puppets });
+  constructor({ scene, physics, floor, hemi, sun, puppets, sky, stars = 700 }) {
+    Object.assign(this, { scene, physics, floor, hemi, sun, puppets, sky });
     this.timeScale = 1; this.active = false; this.t = 0; this.timers = [];
     this.orig = {
       bg: new THREE.Color(scene.background), fog: scene.fog.color.clone(), near: scene.fog.near, far: scene.fog.far,
       hemiSky: hemi.color.clone(), hemiGround: hemi.groundColor.clone(), hemiI: hemi.intensity,
       sun: sun.color.clone(), sunI: sun.intensity, floor: floor.material.color.clone(),
+      skyTop: sky.u.top.value.clone(), skyHorizon: sky.u.horizon.value.clone(), skyGlow: sky.u.glow.value.clone(),
+      moon: sky.moon.material.color.clone(),
     };
-    const pole = new THREE.MeshLambertMaterial({ color: 0x2a2018 });
+    const pole = toon(0x2a2018), glow = glowTexture();
     this.lamps = LANTERNS.map(([x, z]) => {
       const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 1.8, 6), pole);
       p.position.set(x, 0.9, z);
-      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.2), new THREE.MeshBasicMaterial({ color: 0x1e1a16 }));
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.3, 0.2), new THREE.MeshBasicMaterial({ color: LAMP_BASE }));
       lamp.position.set(x, 1.95, z);
-      scene.add(p, lamp);
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: glow, color: LAMP_BASE, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false, opacity: 0.8,
+      }));
+      halo.position.copy(lamp.position); halo.scale.setScalar(1.1);
+      lamp.userData.halo = halo;
+      scene.add(p, lamp, halo);
       return lamp;
     });
     const n = stars, pos = new Float32Array(n * 3);
@@ -43,7 +53,7 @@ export class Sanctum {
     this.active = true; this.t = 0; this.pulse = 0; this.collapsed = false;
     this.p = PRESETS[presetIdx % PRESETS.length];
     this.rule = RULES[ruleIdx % RULES.length].id;
-    this.pc = Object.fromEntries(['bg', 'fog', 'hemiSky', 'hemiGround', 'sun', 'lantern', 'stars', 'floor'].map(k => [k, new THREE.Color(this.p[k])]));
+    this.pc = Object.fromEntries(['bg', 'fog', 'hemiSky', 'hemiGround', 'sun', 'lantern', 'stars', 'floor', 'skyTop', 'skyHorizon', 'skyGlow', 'moon'].map(k => [k, new THREE.Color(this.p[k])]));
     this.stars.material.color.copy(this.pc.stars);
     this.ring.material.color.copy(this.pc.lantern);
     this.stars.visible = this.ring.visible = true;
@@ -59,7 +69,10 @@ export class Sanctum {
     s.background.copy(o.bg); s.fog.color.copy(o.fog); s.fog.near = o.near; s.fog.far = o.far;
     this.hemi.color.copy(o.hemiSky); this.hemi.groundColor.copy(o.hemiGround); this.hemi.intensity = o.hemiI;
     this.sun.color.copy(o.sun); this.sun.intensity = o.sunI; this.floor.material.color.copy(o.floor);
-    for (const l of this.lamps) l.material.color.set(0x1e1a16);
+    for (const l of this.lamps) { l.material.color.set(LAMP_BASE); l.userData.halo.material.color.set(LAMP_BASE); }
+    const u = this.sky.u;
+    u.top.value.copy(o.skyTop); u.horizon.value.copy(o.skyHorizon); u.glow.value.copy(o.skyGlow);
+    this.sky.moon.material.color.copy(o.moon);
     this.stars.visible = this.ring.visible = false;
     this.stars.material.opacity = 0;
   }
@@ -81,7 +94,13 @@ export class Sanctum {
       this.ring.scale.setScalar(Math.max(0.01, (t / 1.6) * 45));
       this.ring.material.opacity = 0.7 * (1 - t / 1.6);
     } else this.ring.visible = false;
-    this.lamps.forEach((l, i) => { if (t > 0.6 + i * 0.12) l.material.color.lerp(pc.lantern, 0.12); });
+    const u = this.sky.u;
+    u.top.value.copy(o.skyTop).lerp(pc.skyTop, k); u.horizon.value.copy(o.skyHorizon).lerp(pc.skyHorizon, k);
+    u.glow.value.copy(o.skyGlow).lerp(pc.skyGlow, k); this.sky.moon.material.color.copy(o.moon).lerp(pc.moon, k);
+    this.lamps.forEach((l, i) => {
+      if (t > 0.6 + i * 0.12) l.material.color.lerp(pc.lantern, 0.12);
+      l.userData.halo.material.color.copy(l.material.color);
+    });
 
     if (!this.collapsed && t > 2.4) {
       this.collapsed = true;
