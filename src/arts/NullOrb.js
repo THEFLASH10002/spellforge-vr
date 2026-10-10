@@ -14,15 +14,16 @@ export const NULL = {
   mergeMinCharge: 0.35,  // both orbs must be at least this charged
   mergeHold: 0.2,        // s the orbs must stay together
   chargeTime: 2.0,       // s to full charge (a merged orb starts at the higher of the two charges)
-  hover: 0.2,            // m above the fingertips' midpoint
+  hover: 0.3,            // m above the fingertips' midpoint (the orb is twice Blue/Red's size)
   smooth: 25,
   minHold: 0.4,          // s before a throw registers
   throwMinSpeed: 1.6, throwDot: 0.55, armExtend: 0.5, armSpeed: 0.9,
   maxHold: 10,
-  speed: 18,             // m/s
-  lifetime: 3.2,         // s (about 58 m of travel)
-  tube: 0.9,             // m radius of the erase tube at no charge
-  tubeCharge: 0.5,       // extra radius at full charge
+  speed: 10,             // m/s (slow and heavy)
+  lifetime: 5,           // s (about 50 m of travel)
+  tube: 1.2,             // m radius of the erase tube at no charge
+  tubeCharge: 0.6,       // extra radius at full charge
+  size: 2,               // orb size relative to Blue/Red (visual)
   scarEvery: 0.7,        // m between ground-outline cross-sections
   cooldown: 1.5,
 };
@@ -122,7 +123,7 @@ export class NullOrb {
     } else if ((this.lost += dt) > 0.8) { this.finish(false); return; }
 
     this.t += dt;
-    const c = (this.charge = clamp01(this.t / NULL.chargeTime)), radius = 0.04 + 0.1 * smooth(c);
+    const c = (this.charge = clamp01(this.t / NULL.chargeTime)), radius = NULL.size * (0.04 + 0.05 * smooth(c));
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, c, radius);
     this.orb.setHorizon(radius * 1.45, 1, 2 + 2 * c);
@@ -163,7 +164,7 @@ export class NullOrb {
     this.pos.addScaledVector(this.dir, step);
     this.sweep(this.prev, this.pos, R);
 
-    const radius = 0.15 + 0.04 * c;
+    const radius = NULL.size * (0.12 + 0.02 * c);
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, 1, radius);
     this.orb.setHorizon(radius * 1.6, 1, 4);
@@ -171,7 +172,8 @@ export class NullOrb {
     fx.burst(this.pos, 0xc070ff, 2, 1);
 
     const gy = terrainHeight(this.pos.x, this.pos.z);
-    if (this.pos.y - gy < 3 + R) { // near the ground: mark where it passed
+    const above = this.pos.y - gy;
+    if (above >= 0 && above < 3 + R) { // above the land and near it: mark where it passed (nothing if it is underground)
       this.scarAcc += step; this.cutAcc += step;
       if (this.scarAcc >= NULL.scarEvery) { this.scar.add(this.pos.x, this.pos.z, this.dir.x, this.dir.z, R * 2); this.scarAcc = 0; }
       if (this.cutAcc >= R * 1.6) { this.grass.setCut(this.cutI++ % 32, this.pos.x, this.pos.z, R * 1.1); this.cutAcc = 0; }
