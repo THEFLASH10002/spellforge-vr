@@ -7,6 +7,7 @@ export function setupHands(renderer, scene) {
   const hands = [];
   for (let i = 0; i < 2; i++) {
     const hand = renderer.xr.getHand(i);
+    hand.addEventListener('connected', e => { hand.userData.handedness = e.data.handedness; });
     hand.add(factory.createHandModel(hand, 'spheres'));
     scene.add(hand);
     hands.push(hand);
