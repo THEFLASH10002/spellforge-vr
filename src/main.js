@@ -79,7 +79,7 @@ const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
 caster.destructibles = targets;
 caster.env = env;
-const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, stars: QUALITY.stars });
+const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, renderer, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
 const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); } });
@@ -198,4 +198,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, mood, MOOD }; // debug/test hook
+window.spellforge = { camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, mood, MOOD }; // debug/test hook

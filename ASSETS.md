@@ -87,3 +87,8 @@ Built-in: Draco decoder (`public/draco/`, Apache-2.0, from three.js).
   inspired by the Nightfall ability, and the aurora curtains' separate alpha/brightness curves by the Aurora ability, both in
   [majidmanzarpour/threejs-vfx](https://github.com/majidmanzarpour/threejs-vfx) (MIT, (c) mohamedachrefelouafi). That repo renders them as
   ray-marched volumes, which is too costly for Quest 2, so these are original cheap shader rebuilds, not copied code.
+- **Spiral galaxy** (`src/vfx/GalaxyPoints.js`): the spiral-arm star placement, the cubed-random size distribution and the hollow centre are adapted from
+  [AmitDigga/threejs-galaxy-shader](https://github.com/AmitDigga/threejs-galaxy-shader), MIT License, Copyright 2025 AMIT DIGGA
+  (https://github.com/AmitDigga/threejs-galaxy-shader/blob/main/LICENSE). Changes: palette by radius, warm core + halo, VR point-size clamp, slowed time.
+- **Not used:** `syakubson/procedural-galaxy` and `vanrez-nez/starfield` have no license file, so none of their code or textures were copied. Only the general
+  idea of baking a nebula into a texture was borrowed; the bake shader (`src/vfx/NebulaBake.js`) is original.

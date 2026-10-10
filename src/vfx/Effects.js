@@ -57,7 +57,7 @@ class Sparks {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     g.setAttribute('color', new THREE.BufferAttribute(this.col, 3));
-    this.pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.07, vertexColors: true, ...ADD }));
+    this.pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.09, vertexColors: true, map: glow, ...ADD })); // soft round glints, not hard squares
     this.pts.frustumCulled = false;
     scene.add(this.pts);
   }

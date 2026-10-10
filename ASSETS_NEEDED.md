@@ -54,3 +54,29 @@ Sites: **Poly Pizza** (poly.pizza), **Sketchfab** (filter Downloadable + CC0/CC-
   simplification will not help — pick a lighter model instead).
 - Whole-scene budget on Quest 2: about 150k triangles. The scene is already near that with the current village houses
   and trees (the on-panel `tris` readout shows the live total), so prefer **low-poly** props and reduce counts before adding more.
+
+## Star Void sky: optional nebula texture (nothing here is required)
+
+The Star Void Sanctum **generates its own nebula at load** (`src/vfx/NebulaBake.js`, a one-time bake, no download needed). If you want a
+hand-made or photographic nebula instead, drop in an **equirectangular** panorama and it replaces the generated one.
+
+**Install**
+1. Put the image at `public/assets/textures/nebula.jpg` (create the `textures` folder next to `models`).
+2. Add this to `public/assets/manifest.json` (next to `"slots"`):
+```json
+"textures": { "nebula": "textures/nebula.jpg" }
+```
+3. Reload. The console logs `[assets] textures loaded: nebula`. Remove the line to go back to the generated nebula.
+
+**Image requirements:** equirectangular (2:1), JPG, **2048x1024** is plenty (1024x512 for a tight Quest budget), sRGB, dark background with
+colored clouds (stars in the image are fine; the game adds its own). Avoid images with a bright sun or big hard-edged objects.
+
+**Where to look (verify each license; I could not browse to confirm any of these):**
+- **Poly Haven** (polyhaven.com, HDRIs, all CC0): search `space`, `night sky`. Few true space panoramas, but some night skies work. Download as JPG/tonemapped, 2k.
+- **Solar System Scope** (solarsystemscope.com/textures): has a Milky Way / stars equirectangular map; check the license listed on that page (attribution may be required).
+- **ESO** (eso.org/public/images, Milky Way panoramas) and **NASA/ESA** image libraries: panoramas are credited and usually freely reusable with credit; check each image page.
+- **Procedural generators**: search `space skybox generator` (some output cube faces that you can convert to equirectangular).
+Log any texture you add in the license table in `ASSETS.md`.
+
+**Tuning (no assets needed):** star and particle counts per quality preset are in `src/config/Quality.js` under `cosmos`
+(`galaxy`, `near`, `dust`, `ribbons`, `nebula` size). Lower them if the headset struggles, raise them on desktop.

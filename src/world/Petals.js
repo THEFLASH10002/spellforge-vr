@@ -47,10 +47,10 @@ void main(){
 }`;
 
 const frag = `
-varying vec3 vCol; varying float vA; varying vec2 vQ;
+uniform float uTintK; varying vec3 vCol; varying float vA; varying vec2 vQ;
 void main(){
   float d = length(vQ * vec2(1.0, 0.8));
-  float a = smoothstep(0.5, 0.3, d) * vA * 0.9;
+  float a = smoothstep(0.5, 0.12, d) * vA * 0.9 * (1.0 - 0.55 * uTintK); // subtler when recoloured (Sanctum) // soft-edged so close petals aren't hard squares
   if (a < 0.01) discard;
   gl_FragColor = vec4(vCol, a);
   #include <colorspace_fragment>

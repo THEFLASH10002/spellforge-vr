@@ -15,6 +15,7 @@ export class AssetManager {
     const am = new AssetManager();
     am.swayTime = { value: 0 };  // shared wind clock for swaying instanced slots ("sway": true)
     am.glowMats = [];
+    am.textures = {};            // optional user textures from manifest.textures (e.g. an equirectangular nebula)
     am.registry = [];            // { im, points, h, r } for every instanced mesh, so individual instances can be erased            // blossom materials (slot option "glow") so the Sanctum can recolor them
     am.manifest = { slots: {}, decor: [] };
     try {
@@ -28,6 +29,14 @@ export class AssetManager {
     const jobs = Object.entries(am.manifest.slots).map(([name, cfg]) => am.fetchModel(cfg.file).then(g => { if (g) am.raw[name] = g; }));
     am.decorRaw = await Promise.all((am.manifest.decor || []).map(d => am.fetchModel(d.file)));
     await Promise.all(jobs);
+    await Promise.all(Object.entries(am.manifest.textures || {}).map(async ([name, file]) => {
+      try {
+        const t = await new THREE.TextureLoader().loadAsync(url('assets/' + file));
+        t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; t.wrapS = THREE.RepeatWrapping;
+        am.textures[name] = t;
+      } catch (e) { console.warn(`[assets] could not load texture ${file}:`, e.message || e); }
+    }));
+    if (Object.keys(am.textures).length) console.log('[assets] textures loaded:', Object.keys(am.textures).join(', '));
     const found = Object.keys(am.raw);
     console.log(`[assets] GLB slots loaded: ${found.length ? found.join(', ') : 'none (procedural placeholders)'}`);
     return am;
