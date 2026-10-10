@@ -62,11 +62,13 @@ export class Recorder {
     this.rec.sigils.push(sigil);
     saveCustom(this.rec.sigils);
     this.message = `Saved "${sigil.name}" -> ${this.artId}`;
+    this.onSaved?.(sigil); // the spellbook adds a page
   }
 
   clearCustom() {
     this.rec.sigils = this.rec.sigils.filter(s => s.builtin);
     saveCustom(this.rec.sigils);
     this.message = 'Custom Sigils cleared';
+    this.onChanged?.();
   }
 }

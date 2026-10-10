@@ -73,6 +73,8 @@ Do NOT use assets ripped from games or anime (no franchise assets; see the origi
 | `lantern.glb` | "Hanging Lantern" on Poly Pizza | Kay Lousberg | CC0 (verify on the model page) |
 | `machiya.glb` (optimized: 1024 px WebP, meshopt) | "low_poly_japenese_house": **source and license unknown, fill in** | ? | ? |
 
+| `book.glb` (optimized: 1024 px WebP, meshopt; skinned + animated) | "flying_magic_book" (looks like a Sketchfab download): **source and license unknown, fill in** | ? | ? |
+
 Originals of optimized models are kept in the git-ignored `assets-src/` folder.
 Optimize command: `npx @gltf-transform/cli@4 optimize in.glb out.glb --texture-compress webp --texture-size 1024 --compress meshopt`
 

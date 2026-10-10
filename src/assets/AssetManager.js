@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 import { toonify, outlineHull, applyGlow, makeSway } from '../render/Toon.js';
 
 const url = p => new URL(p, document.baseURI).href;
@@ -43,13 +44,14 @@ export class AssetManager {
   }
 
   async fetchModel(file) {
-    try { return (await this.loader.loadAsync(url('assets/' + file))).scene; }
+    try { const g = await this.loader.loadAsync(url('assets/' + file)); g.scene.animations = g.animations; return g.scene; } // animations ride on the scene
     catch (e) { console.warn(`[assets] could not load ${file}:`, e.message || e); return null; }
   }
 
   // Normalize: rotate, scale (fitHeight in meters or scale), center X/Z on origin, sit on y=0.
   prep(source, cfg) {
-    const root = source.clone(true);
+    const root = SkeletonUtils.clone(source); // also clones skinned meshes correctly
+    root.animations = source.animations || [];
     if (cfg.toon !== false) toonify(root);
     if (cfg.glow) this.glowMats.push(...applyGlow(root, cfg.glow));
     root.rotation.y = THREE.MathUtils.degToRad(cfg.rotY || 0);

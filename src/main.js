@@ -26,6 +26,7 @@ import { Environment } from './world/Environment.js';
 import { GravityWell, WELL, RED, RED_VARIANT } from './arts/GravityWell.js';
 import { WellMood, MOOD } from './vfx/WellMood.js';
 import { NullOrb, NULL } from './arts/NullOrb.js';
+import { Spellbook } from './ui/Spellbook.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -89,6 +90,11 @@ const well = new GravityWell({ scene, physics, env, targets });            // Bl
 const red = new GravityWell({ scene, physics, env, targets, variant: RED_VARIANT }); // Red: repels
 well.other = red; red.other = well;
 const nullOrb = new NullOrb({ scene, physics, env, targets, assets, grass, well, red }); // Purple: Blue + Red merged
+const spellbook = new Spellbook({ scene, assets, getSigils: () => recognizer.sigils }); // every saved Sigil gets a page
+recorder.onSaved = s => spellbook.discover(s);
+recorder.onChanged = () => spellbook.refresh();
+let placeBook = false;
+renderer.xr.addEventListener('sessionstart', () => { placeBook = true; });
 const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red, nullOrb] });
 recognizer.onCast = (sigil, hand, which) => {
   lastCast = sigil.name;
@@ -130,12 +136,12 @@ panel.addButton({ label: 'Rename Last', x: 10, y: 530, w: 240, h: 70, onPress: (
   const s = lastCustom(); if (!s) return;
   nameIdx++;
   s.name = `${ADJ[nameIdx % ADJ.length]} ${NOUN[(nameIdx * 7 + 3) % NOUN.length]}`;
-  saveCustom(recognizer.sigils);
+  saveCustom(recognizer.sigils); spellbook.refresh();
 } });
 panel.addButton({ label: 'Rebind Last', x: 262, y: 530, w: 240, h: 70, onPress: () => {
   const s = lastCustom(); if (!s) return;
   s.artId = ART_IDS[(ART_IDS.indexOf(s.artId) + 1) % ART_IDS.length];
-  saveCustom(recognizer.sigils);
+  saveCustom(recognizer.sigils); spellbook.refresh();
 } });
 
 const headQ = new THREE.Quaternion(), headPos = new THREE.Vector3();
@@ -186,6 +192,8 @@ renderer.setAnimationLoop(() => {
   well.update(dt, headPos, headQ, L, R);
   red.update(dt, headPos, headQ, L, R);
   nullOrb.update(dt, headPos, headQ, L, R);
+  if (placeBook && renderer.xr.isPresenting) { spellbook.place(headPos, headCam.getWorldDirection(new THREE.Vector3())); placeBook = false; }
+  spellbook.update(dt, clock.elapsedTime); spellbook.poke([L?.tip, R?.tip], performance.now());
   caster.update(dt, headPos);
   fx.update(dt);
   env.update(dt, clock.elapsedTime, headPos);
@@ -198,4 +206,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, mood, MOOD }; // debug/test hook
+window.spellforge = { recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook
