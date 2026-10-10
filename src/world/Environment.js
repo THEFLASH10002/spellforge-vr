@@ -6,6 +6,7 @@ import { Petals } from './Petals.js';
 import { QUALITY } from '../config/Quality.js';
 
 const DEG = 180 / Math.PI;
+const MOOD_DARK = new THREE.Color(0x0a1438), MOOD_BLUE = new THREE.Color(0x5aa0ff);
 let seed = 11;
 const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
 const ringPt = (deg, r) => [Math.cos((deg * Math.PI) / 180) * r, Math.sin((deg * Math.PI) / 180) * r];
@@ -124,6 +125,16 @@ export class Environment {
     const p = this.wellPos, w = this.wellK;
     this.petals.u.uWell.value.set(p.x, p.y, p.z, w);
     this.grass.uniforms.uWell.value.set(p.x, p.y, p.z, w);
+  }
+
+  // Gravity Well mood: blue spill on the grass near `pos` (k 0..1).
+  setGlow(pos, k) { this.grass.uniforms.uGlow.value.set(pos.x, pos.y, pos.z, k); }
+
+  // Gravity Well mood (only while the Sanctum is not active): darken grass/mountains, tint petals blue.
+  setMoodTint(m) {
+    this.grass.uniforms.uTint.value.copy(this.grassBase).multiplyScalar(1 - 0.45 * m);
+    for (const mt of this.mountains) mt.mat.color.copy(mt.base).lerp(MOOD_DARK, 0.6 * m);
+    this.petals.setTint(MOOD_BLUE, 0.5 * m);
   }
 
   // Attract petals + grass toward `pos` with strength k (0..1). Pass (null, 0) to release.

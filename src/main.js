@@ -24,6 +24,7 @@ import { buildTerrain, buildTrainingGround, terrainHeight, onPath, PADS, FLAT } 
 import { Grass } from './world/Grass.js';
 import { Environment } from './world/Environment.js';
 import { GravityWell, WELL } from './arts/GravityWell.js';
+import { WellMood, MOOD } from './vfx/WellMood.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -84,6 +85,7 @@ const director = new Director({ targets, caster, onReset: () => { sanctum.reset(
 let lastCast = '-';
 let nextArt = 0;
 const well = new GravityWell({ scene, physics, env, targets });
+const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum });
 recognizer.onCast = (sigil, hand, which) => {
   lastCast = `${sigil.name} (${sigil.artId})`;
   if (sigil.artId === 'sanctum') sanctum.activate(presetIdx, ruleIdx);
@@ -172,10 +174,11 @@ renderer.setAnimationLoop(() => {
   env.update(dt, clock.elapsedTime, headPos);
   district.update(dt * sanctum.timeScale);
   sanctum.update(dt);
+  mood.update(dt, well); // after the Sanctum so it can modulate (or restore) the look
   for (const p of puppets) p.update(dt, clock.elapsedTime);
   panel.poke([L?.tip, R?.tip], performance.now());
   updateHud(dt, R);
   renderer.render(scene, camera);
 });
 
-window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL }; // debug/test hook
+window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL, mood, MOOD }; // debug/test hook

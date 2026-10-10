@@ -43,6 +43,7 @@ export class GravityWell {
     this.pos = new THREE.Vector3(); this.dir = new THREE.Vector3(0, 0, -1); this.headFwd = new THREE.Vector3(0, 0, -1);
     this.hist = []; this.fast = 0; this.lost = 0; this.pulse = 0; this.charge = 0; this.mult = 1;
     this.trail = null; this.status = 'ready'; this.first = true;
+    this.moodTarget = 0; this.moodPos = this.pos; // read by WellMood: how dark/blue the scene should be, and where the light sits
     this.tmp = new THREE.Vector3(); this.box = new THREE.Box3();
   }
 
@@ -86,6 +87,7 @@ export class GravityWell {
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, c, radius);
     this.status = `charging ${Math.round(c * 100)}%`;
+    this.moodTarget = 0.15 + 0.6 * c; // the world darkens and turns blue as it charges
 
     if ((this.pulse -= dt) <= 0 && c > 0.4) { fx.shock(this.pos, UP, 0x5ac8ff, 0.8 + c); this.pulse = 0.9 - 0.5 * c; }
     // Light objects near the hand lean toward the forming orb; petals start to stream in.
@@ -142,6 +144,7 @@ export class GravityWell {
     this.field(this.pos, WELL.radius * 0.7, WELL.strongRadius * 0.6, WELL.force * 0.5 * this.mult, dt); // pulls debris/ragdolls along the way
     this.env.setWell(this.pos, 0.6);
     this.status = 'flying';
+    this.moodTarget = 0.85;
     if ((this.life -= dt) <= 0) this.impact();
   }
 
@@ -191,6 +194,7 @@ export class GravityWell {
     const dustY = Math.max(0.1, this.pos.y - terrainHeight(this.pos.x, this.pos.z));
     this.orb.update(this.clock, dt, 1, grow * collapse, 1, dustY);
     this.status = `collapsing ${Math.max(0, this.singT - this.sT).toFixed(1)}s`;
+    this.moodTarget = 1.0;
     if (this.sT >= this.singT) this.collapse(true);
   }
 
@@ -207,11 +211,12 @@ export class GravityWell {
     } else fx.burst(this.pos, 0x7fd8ff, 20, 2);
     this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null; this.env.setWell(null, 0);
     this.status = 'ready'; this.cool = Math.max(this.cool, 0.3);
+    this.moodTarget = 0; // WellMood eases the light back slowly (~2.5 s) after the blue is gone
   }
 
   reset() {
     this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null;
-    this.cool = 0; this.env.setWell(null, 0); this.status = 'ready';
+    this.cool = 0; this.env.setWell(null, 0); this.status = 'ready'; this.moodTarget = 0;
   }
 
   // ---- the force field -------------------------------------------------------------------------------

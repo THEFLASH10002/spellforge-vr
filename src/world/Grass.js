@@ -22,13 +22,13 @@ export class Grass {
     geo.instanceCount = count;
 
     this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uTime: { value: 0 }, uWell: { value: new THREE.Vector4() }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
+      uTime: { value: 0 }, uWell: { value: new THREE.Vector4() }, uGlow: { value: new THREE.Vector4() }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
       uBase: { value: new THREE.Color(0x2f5e1e) }, uTip: { value: new THREE.Color(0x9ad258) },
     }]);
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms, side: THREE.DoubleSide, fog: true,
-      vertexShader: `attribute vec3 aOffset; attribute vec2 aRand; attribute float aTip; uniform float uTime; uniform vec4 uWell;
-        varying float vTip; varying float vShade;
+      vertexShader: `attribute vec3 aOffset; attribute vec2 aRand; attribute float aTip; uniform float uTime; uniform vec4 uWell; uniform vec4 uGlow;
+        varying float vTip; varying float vShade; varying float vGlow;
         #include <fog_pars_vertex>
         void main(){
           float a = aRand.x * 6.2831; float s = sin(a), c = cos(a);
@@ -39,15 +39,17 @@ export class Grass {
           float wf = uWell.w * smoothstep(8.0, 0.0, length(dw));
           world.xz += normalize(dw + vec2(0.0001)) * wf * 0.7 * aTip * aTip * h;
           world.y -= wf * 0.3 * aTip * h;
+          vGlow = uGlow.w * smoothstep(9.0, 0.0, length(world - uGlow.xyz)); // blue spill from the Gravity Well
           vTip = aTip; vShade = 0.75 + aRand.x * 0.5;
           vec4 mvPosition = modelViewMatrix * vec4(world, 1.0);
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }`,
-      fragmentShader: `uniform vec3 uTint; uniform vec3 uBase; uniform vec3 uTip; varying float vTip; varying float vShade;
+      fragmentShader: `uniform vec3 uTint; uniform vec3 uBase; uniform vec3 uTip; varying float vTip; varying float vShade; varying float vGlow;
         #include <fog_pars_fragment>
         void main(){
-          gl_FragColor = vec4(mix(uBase, uTip, vTip) * uTint * vShade, 1.0);
+          vec3 col = mix(uBase, uTip, vTip) * uTint * vShade + vec3(0.08, 0.4, 1.0) * vGlow * (0.4 + 0.6 * vTip);
+          gl_FragColor = vec4(col, 1.0);
           #include <colorspace_fragment>
           #include <fog_fragment>
         }`,
