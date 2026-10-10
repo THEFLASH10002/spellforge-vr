@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DestructibleMesh, FractureOptions } from '@dgreenheck/three-pinata';
 import { toon, addOutline } from '../render/Toon.js';
+import { fx } from '../vfx/Effects.js';
 
 // A pre-fractured piece of scenery. The intact mesh (with a fixed collider) is shown until
 // shatter(); then it is hidden and its fragments become dynamic Rapier bodies.
@@ -55,12 +56,14 @@ export class Destructible {
     const dir = new THREE.Vector3(v.x, v.y, v.z);
     const speed = dir.length();
     if (speed < 4) return;
+    other.dead = true; // bolt is consumed by the impact
     this.shatter(other.mesh.position, dir.divideScalar(speed), speed);
   }
 
   shatter(point, dir, speed = 8, delay = 0) {
     if (this.broken) return;
     this.broken = true;
+    fx.burst(point, 0xffe0a0, 28, 4);
     this.physics.untag(this.collider);
     this.physics.world.removeCollider(this.collider, true);
     this.mesh.removeFromParent();

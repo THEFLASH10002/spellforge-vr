@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toon, addOutline } from '../render/Toon.js';
+import { fx } from '../vfx/Effects.js';
 
 // Segmented wooden kugutsu puppet. Alive: a swaying group of box parts with one fixed hit-collider.
 // On hit: each part gets a dynamic Rapier body, joined by spherical joints (ragdoll).
@@ -54,6 +55,7 @@ export class Puppet {
     const dir = new THREE.Vector3(v.x, v.y, v.z);
     const speed = dir.length();
     if (speed < 3) return;
+    other.dead = true;
     this.shatter(other.mesh.position, dir.divideScalar(speed), speed);
   }
 
@@ -61,6 +63,7 @@ export class Puppet {
   shatter(point, dir, speed = 8) {
     if (this.broken) return;
     this.broken = true;
+    fx.burst(this.center, 0xffe0a0, 20, 3);
     this.physics.untag(this.hitbox);
     this.physics.world.removeCollider(this.hitbox, true);
     const R = this.physics.R, w = this.physics.world;

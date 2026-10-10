@@ -18,6 +18,7 @@ import { QUALITY, QUALITY_NAME } from './config/Quality.js';
 import { Perf } from './debug/Perf.js';
 import { toon, cobbleTexture } from './render/Toon.js';
 import { Sky } from './render/Sky.js';
+import { fx } from './vfx/Effects.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -41,6 +42,7 @@ const sun = new THREE.DirectionalLight(0xc4d0ff, 1.5); // cool moonlight key fro
 sun.position.set(-3, 6, 4);
 scene.add(sun);
 const sky = new Sky(scene);
+fx.init(scene);
 
 const physics = await PhysicsWorld.create();
 
@@ -105,7 +107,7 @@ panel.addButton({ label: 'Rebind Last', x: 262, y: 530, w: 240, h: 70, onPress: 
   saveCustom(recognizer.sigils);
 } });
 
-const headQ = new THREE.Quaternion();
+const headQ = new THREE.Quaternion(), headPos = new THREE.Vector3();
 let hudT = 0;
 function updateHud(dt, R) {
   hudT -= dt;
@@ -139,12 +141,15 @@ renderer.setAnimationLoop(() => {
   const dt = clock.getDelta();
   perf.update(dt, renderer, physics);
   physics.step(dt * sanctum.timeScale);
-  (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldQuaternion(headQ);
+  const headCam = renderer.xr.isPresenting ? renderer.xr.getCamera() : camera;
+  headCam.getWorldQuaternion(headQ);
+  headCam.getWorldPosition(headPos);
   const headInv = headQ.clone().invert();
   const lh = handBy('left'), rh = handBy('right');
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
   if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
-  caster.update(dt);
+  caster.update(dt, headPos);
+  fx.update(dt);
   district.update(dt * sanctum.timeScale);
   sanctum.update(dt);
   for (const p of puppets) p.update(dt, clock.elapsedTime);

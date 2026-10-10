@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PRESETS, RULES } from './presets.js';
 import { toon, glowTexture } from '../render/Toon.js';
+import { domeMaterial } from '../vfx/Effects.js';
 
 const LAMP_BASE = 0xffb868; // warm street-lantern glow before the Sanctum recolors it
 
@@ -43,9 +44,8 @@ export class Sanctum {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.stars = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.14, transparent: true, opacity: 0, depthWrite: false, fog: false }));
     this.stars.visible = false; scene.add(this.stars);
-    this.ring = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16),
-      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, fog: false }));
-    this.ring.visible = false; scene.add(this.ring);
+    this.ring = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), domeMaterial()); // shimmering barrier dome
+    this.ring.frustumCulled = false; this.ring.visible = false; scene.add(this.ring);
   }
 
   activate(presetIdx = 0, ruleIdx = 0) {
@@ -55,7 +55,7 @@ export class Sanctum {
     this.rule = RULES[ruleIdx % RULES.length].id;
     this.pc = Object.fromEntries(['bg', 'fog', 'hemiSky', 'hemiGround', 'sun', 'lantern', 'stars', 'floor', 'skyTop', 'skyHorizon', 'skyGlow', 'moon'].map(k => [k, new THREE.Color(this.p[k])]));
     this.stars.material.color.copy(this.pc.stars);
-    this.ring.material.color.copy(this.pc.lantern);
+    this.ring.material.uniforms.color.value.copy(this.pc.lantern);
     this.stars.visible = this.ring.visible = true;
     for (const { body } of this.physics.synced) body.wakeUp();
     if (this.rule === 'lowgrav') this.physics.world.gravity = { x: 0, y: -2.2, z: 0 };
@@ -89,11 +89,10 @@ export class Sanctum {
     this.sun.color.copy(o.sun).lerp(pc.sun, k); this.sun.intensity = o.sunI + (p.sunI - o.sunI) * k;
     this.floor.material.color.copy(o.floor).lerp(pc.floor, k);
     this.stars.material.opacity = k * 0.9; this.stars.rotation.y += dt * 0.03;
-    if (t < 1.6) {
-      this.ring.position.set(0, 1.2, -4);
-      this.ring.scale.setScalar(Math.max(0.01, (t / 1.6) * 45));
-      this.ring.material.opacity = 0.7 * (1 - t / 1.6);
-    } else this.ring.visible = false;
+    const pr = clamp01(t / 1.6), du = this.ring.material.uniforms;
+    this.ring.position.set(0, 1.2, -4);
+    this.ring.scale.setScalar(2 + smooth(pr) * 32); // expands, then stays as a barrier
+    du.time.value += dt; du.intensity.value = 0.35 + (1 - pr);
     const u = this.sky.u;
     u.top.value.copy(o.skyTop).lerp(pc.skyTop, k); u.horizon.value.copy(o.skyHorizon).lerp(pc.skyHorizon, k);
     u.glow.value.copy(o.skyGlow).lerp(pc.skyGlow, k); this.sky.moon.material.color.copy(o.moon).lerp(pc.moon, k);
