@@ -28,6 +28,7 @@ import { WellMood, MOOD } from './vfx/WellMood.js';
 import { NullOrb, NULL } from './arts/NullOrb.js';
 import { Spellbook } from './ui/Spellbook.js';
 import { Locomotion } from './world/Locomotion.js';
+import { HandInteract } from './world/HandInteract.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -84,7 +85,7 @@ caster.env = env;
 const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, renderer, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
-const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); loco.moveTo(0, 0); placeBook = true; } });
+const director = new Director({ targets, caster, onReset: () => { interact.reset(); sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); loco.moveTo(0, 0); placeBook = true; } });
 let lastCast = '-';
 let nextArt = 0;
 const well = new GravityWell({ scene, physics, env, targets });            // Blue: pulls
@@ -96,6 +97,7 @@ recorder.onSaved = s => spellbook.discover(s);
 recorder.onChanged = () => spellbook.refresh();
 // Locomotion: pinch to teleport (hands), thumbstick (controllers), WASD (desktop). The panel + spellbook travel with you.
 const loco = new Locomotion({ renderer, scene, camera, onMove: d => { panel.mesh.position.add(d); spellbook.root.position.add(d); spellbook.baseY += d.y; } });
+const interact = new HandInteract({ physics, targets }); // punch + grab + carry + throw
 let placeBook = false;
 renderer.xr.addEventListener('sessionstart', () => { placeBook = true; });
 const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red, nullOrb] });
@@ -187,16 +189,21 @@ renderer.setAnimationLoop(() => {
   const headInv = headQ.clone().invert();
   const lh = handBy('left'), rh = handBy('right');
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
+  recognizer.active = null;
   if (recorder.active) recorder.update(dt, L, R, headInv); else {
     // A hand that is holding an orb is busy; the other hand can still sign (so you can hold Blue and Red together).
     const holding = h => nullOrb.active || (well.active && well.which === h) || (red.active && red.which === h);
-    const busy = h => holding(h) || loco.pinching[h]; // a pinching hand is aiming a teleport, not signing
+    const busy = h => holding(h) || loco.pinching[h] || interact.isHolding(h); // pinching = aiming a teleport; holding an object = not signing
     recognizer.update(dt, busy('left') ? null : L, busy('right') ? null : R, headInv);
   }
   well.update(dt, headPos, headQ, L, R);
   red.update(dt, headPos, headQ, L, R);
   nullOrb.update(dt, headPos, headQ, L, R);
-  loco.update(dt, headPos, headQ, L, R, h => (well.active && well.which === h) || (red.active && red.which === h) || nullOrb.active);
+  const orbHeld = h => (well.active && well.which === h) || (red.active && red.which === h) || nullOrb.active;
+  loco.update(dt, headPos, headQ, L, R, h => orbHeld(h) || interact.isHolding(h));
+  interact.update(dt, L, R, h => orbHeld(h) || loco.pinching[h]);
+  const act = recognizer.active; // channelled Pull: keeps pulling while the Grasp sign is held
+  if (act && act.sg.artId === 'pull') { const hh = act.hand === 'left' ? L : R; if (hh) caster.pullHold(hh, dt); }
   headFwd.set(0, 0, -1).applyQuaternion(headQ);
   if (placeBook && (renderer.xr.isPresenting || !renderer.xr.enabled)) { spellbook.place(headPos, headFwd); placeBook = false; } // beside you on the left
   spellbook.update(dt, clock.elapsedTime, headPos, headFwd); spellbook.poke([L?.tip, R?.tip], performance.now());
@@ -212,4 +219,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook
+window.spellforge = { interact, loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook

@@ -56,7 +56,7 @@ export class PhysicsWorld {
   trimDebris(max = 200) {
     let over = this.synced.length - max;
     for (let i = 0; i < this.synced.length && over > 0;) {
-      if (this.synced[i].debris) { this.remove(this.synced[i].mesh); over--; } else i++;
+      if (this.synced[i].debris && !this.synced[i].held) { this.remove(this.synced[i].mesh); over--; } else i++;
     }
   }
   remove(mesh) {

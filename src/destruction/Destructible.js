@@ -152,6 +152,7 @@ export class Destructible {
       if (this.pending[i].t <= 0) this.pending.splice(i, 1)[0].fn();
     }
     for (let i = this.live.length - 1; i >= 0; i--) {
+      if (this.live[i].mesh.userData.held) this.live[i].ttl = Math.max(this.live[i].ttl, 3); // being carried: keep it
       if ((this.live[i].ttl -= dt) <= 0) this.physics.remove(this.live.splice(i, 1)[0].mesh);
     }
   }

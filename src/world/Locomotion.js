@@ -94,7 +94,8 @@ export class Locomotion {
     let aimed = false;
     for (const side of ['left', 'right']) {
       const h = side === 'left' ? L : R;
-      if (!h || holding(side) || this.cool > 0) { this.pinching[side] = false; continue; }
+      const fist = h && (h.curls[1] + h.curls[2] + h.curls[3] + h.curls[4]) / 4 < 0.72; // a fist is for grabbing / punching
+      if (!h || fist || holding(side) || this.cool > 0) { this.pinching[side] = false; continue; }
       const d = h.thumb.distanceTo(h.tip), now = this.pinching[side] ? d < PINCH_OFF : d < PINCH_ON;
       this.pinching[side] = now;
       if (now && (!this.aim || this.aim === side)) { this.aim = side; this.hold += dt; this.showArc(h, head); aimed = true; }

@@ -72,6 +72,40 @@ export class ArtCaster {
     this.pulling = { t: 0, pos: hand.wrist.clone() }; // nearby petals stream toward the hand for a moment
   }
 
+  // Pull, channelled: call every frame while the Grasp sign is held. Loose things in front of the palm accelerate toward the
+  // hand, float against gravity, and gather and hover near the palm; enemies are ragdolled and dragged in. Release = they drop.
+  pullHold(hand, dt) {
+    const dir = hand.normal, art = ARTS.pull;
+    const to = this.tmpTo ||= new THREE.Vector3();
+    for (const d of this.destructibles) {
+      if (d.broken) continue;
+      to.copy(d.center || d.mesh.position).sub(hand.wrist);
+      if (to.length() < (d.center ? 10 : 8) && to.normalize().dot(dir) > 0.8) d.shatter(hand.wrist, dir, 10, true);
+    }
+    const hover = this.tmpHover ||= new THREE.Vector3(), d = this.tmpD ||= new THREE.Vector3();
+    hover.copy(hand.wrist).addScaledVector(dir, 0.9); hover.y += 0.05; // things gather just in front of the palm
+    for (const e of this.physics.synced) {
+      if (e.projectile || e.held) continue;
+      to.copy(e.mesh.position).sub(hand.wrist);
+      const dist = to.length();
+      d.copy(hover).sub(e.mesh.position);
+      const L = d.length();
+      if (L > 2.2 && (dist > 13 || to.divideScalar(dist).dot(dir) < 0.7)) continue; // far: only what is in the cone; near: keep what is gathered
+      const v = e.body.linvel();
+      let vx = v.x, vy = v.y, vz = v.z;
+      if (L > 1.4) { // far: accelerate toward the hover point (and nearly cancel gravity)
+        const acc = 38 * Math.max(0, 1 - dist / 14) + 6; d.divideScalar(L);
+        vx += d.x * acc * dt; vy += d.y * acc * dt + 9.0 * dt; vz += d.z * acc * dt;
+      } else { // arrived: spring onto the hover point so it is caught instead of flying past
+        const k = 0.35; vx += (d.x * 9 - vx) * k; vy += (d.y * 9 - vy) * k; vz += (d.z * 9 - vz) * k;
+      }
+      const sp = Math.hypot(vx, vy, vz); if (sp > 14) { const c = 14 / sp; vx *= c; vy *= c; vz *= c; }
+      e.body.setLinvel({ x: vx, y: vy, z: vz }, true);
+    }
+    this.pulling = { t: 0, pos: hand.wrist.clone() }; // keeps the petals streaming
+    if ((this.pullRing = (this.pullRing ?? 0) - dt) <= 0) { this.pullRing = 0.35; fx.shock(hand.wrist.clone().addScaledVector(dir, 0.6), dir, art.color, 0.7, 0.35, true); } // small pulse rings, not a view-filling dome
+  }
+
   clear() {
     for (const e of this.live) { if (e.mesh) this.physics.remove(e.mesh); e.trail.dispose(); }
     this.live = [];

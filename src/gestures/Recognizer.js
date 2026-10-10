@@ -10,9 +10,11 @@ export class Recognizer {
     this.hold = 0; this.key = null; this.armed = true; this.free = 0;
     this.cool = {};
     this.debug = null;
+    this.active = null; // { sg, hand } while a Sigil is matched and held past its hold time (for channelled Arts)
   }
 
   update(dt, L, R, headInv) {
+    this.active = null;
     for (const k in this.cool) this.cool[k] = Math.max(0, this.cool[k] - dt);
     const two = L && R ? twoHandVec(L, R, headInv) : null;
     let best = null;
@@ -38,6 +40,7 @@ export class Recognizer {
     const key = hit.sg.id + '|' + hit.hand;
     if (key !== this.key) { this.key = key; this.hold = 0; }
     this.hold += dt;
+    if (this.hold >= (hit.sg.hold ?? this.holdTime)) this.active = { sg: hit.sg, hand: hit.hand };
     if (this.hold >= (hit.sg.hold ?? this.holdTime) && this.armed && !(this.cool[hit.sg.id] > 0)) {
       this.armed = false;
       this.cool[hit.sg.id] = hit.sg.cooldown ?? this.cooldown;
