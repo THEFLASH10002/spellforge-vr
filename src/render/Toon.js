@@ -54,3 +54,37 @@ export function glowTexture() {
   g.fillStyle = grad; g.fillRect(0, 0, 64, 64);
   return new THREE.CanvasTexture(c);
 }
+
+// ---- GLB helpers ------------------------------------------------------------------------------------
+const toonCache = new Map();
+
+// Convert any imported materials to the toon ramp, keeping their color/maps.
+export function toonify(root) {
+  const conv = m => {
+    if (m.isMeshToonMaterial) return m;
+    let t = toonCache.get(m);
+    if (!t) {
+      t = new THREE.MeshToonMaterial({
+        color: m.color ? m.color.clone() : 0xffffff, map: m.map, gradientMap: ramp,
+        emissive: m.emissive ? m.emissive.clone() : 0x000000, emissiveMap: m.emissiveMap, emissiveIntensity: m.emissiveIntensity ?? 1,
+        alphaTest: m.alphaTest, transparent: m.transparent, opacity: m.opacity, side: m.side, vertexColors: m.vertexColors,
+      });
+      toonCache.set(m, t);
+    }
+    return t;
+  };
+  root.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material); });
+}
+
+// Normal-extrusion outline for imported meshes (works best on smooth-shaded models). `t` is in local units.
+export function outlineHull(root, t = 0.02) {
+  if (!QUALITY.outline) return;
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { thick: { value: t }, color: { value: new THREE.Color(0x0b0714) } }, side: THREE.BackSide,
+    vertexShader: 'uniform float thick; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thick, 1.0); }',
+    fragmentShader: 'uniform vec3 color; void main(){ gl_FragColor = vec4(color, 1.0); }',
+  });
+  const meshes = [];
+  root.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.userData.isOutline && o.geometry.attributes.normal) meshes.push(o); });
+  for (const m of meshes) { const h = new THREE.Mesh(m.geometry, mat); h.userData.isOutline = true; m.add(h); }
+}

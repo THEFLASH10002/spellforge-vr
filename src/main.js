@@ -19,6 +19,7 @@ import { Perf } from './debug/Perf.js';
 import { toon, cobbleTexture } from './render/Toon.js';
 import { Sky } from './render/Sky.js';
 import { fx } from './vfx/Effects.js';
+import { AssetManager } from './assets/AssetManager.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -56,7 +57,9 @@ const hands = setupHands(renderer, scene);
 const handBy = side => hands.find(h => h.userData.handedness === side);
 
 
-const district = buildDistrict(physics, scene);
+const assets = await AssetManager.load();
+const district = buildDistrict(physics, scene, assets);
+assets.buildDecor(scene);
 const puppets = [[-1.6, -3.5], [0.2, -4], [1.8, -3.5], [2, -5.2]].map(([x, z], i) => new Puppet(physics, scene, x, z, i));
 
 const recognizer = new Recognizer();
@@ -65,7 +68,7 @@ const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
 caster.destructibles = targets;
-const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, stars: QUALITY.stars });
+const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
 const director = new Director({ targets, caster, onReset: () => sanctum.reset() });

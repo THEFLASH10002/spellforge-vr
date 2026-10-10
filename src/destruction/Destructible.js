@@ -43,6 +43,7 @@ export class Destructible {
   reset() {
     for (const e of this.live) this.physics.remove(e.mesh);
     this.live = []; this.pending = [];
+    this.onReset?.();
     if (!this.broken) return;
     this.broken = false;
     for (const f of this.frags) { f.position.copy(f.userData.home); f.quaternion.identity(); }
@@ -63,6 +64,7 @@ export class Destructible {
   shatter(point, dir, speed = 8, delay = 0) {
     if (this.broken) return;
     this.broken = true;
+    this.onShatter?.(point, dir, speed); // lets a GLB skin hide and the rest of its structure follow
     fx.burst(point, 0xffe0a0, 28, 4);
     this.physics.untag(this.collider);
     this.physics.world.removeCollider(this.collider, true);

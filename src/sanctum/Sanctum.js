@@ -12,7 +12,7 @@ const LANTERNS = [[-5.6, -2], [-5.6, -5], [-5.6, -8], [-5.6, -11], [5.8, -2], [5
 // Personal domain: tweens sky/fog/lights/floor, ignites lanterns, collapses remaining puppets,
 // then runs one gameplay rule (low gravity | slow time | pulse shockwaves) until reset.
 export class Sanctum {
-  constructor({ scene, physics, floor, hemi, sun, puppets, sky, stars = 700 }) {
+  constructor({ scene, physics, floor, hemi, sun, puppets, sky, assets, stars = 700 }) {
     Object.assign(this, { scene, physics, floor, hemi, sun, puppets, sky });
     this.timeScale = 1; this.active = false; this.t = 0; this.timers = [];
     this.orig = {
@@ -34,6 +34,8 @@ export class Sanctum {
       halo.position.copy(lamp.position); halo.scale.setScalar(1.1);
       lamp.userData.halo = halo;
       scene.add(p, lamp, halo);
+      const skin = assets?.get('lantern', { fitHeight: 2.1 }); // GLB replaces pole + lamp; halo still recolors
+      if (skin) { skin.position.set(x, 0, z); scene.add(skin); p.visible = lamp.visible = false; }
       return lamp;
     });
     const n = stars, pos = new Float32Array(n * 3);
