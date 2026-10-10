@@ -27,9 +27,9 @@ function sanctumSigil() {
 // Built-in Sigils are rule-style: only curl (and optionally palm direction) are compared.
 export const BUILTINS = [
   {
-    // Fang: index finger out, middle/ring/pinky curled (thumb ignored). Fires the Bolt.
-    id: 'twin-fang', name: 'Fang', hand: 'any', artId: 'bolt', builtin: true, thresh: 0.12,
-    vec: tpl([0, E, C, C, C]),
+    // Triple Fang: index + middle + ring out, pinky curled (thumb ignored). Fires the Bolt.
+    id: 'twin-fang', name: 'Triple Fang', hand: 'any', artId: 'bolt', builtin: true, thresh: 0.12,
+    vec: tpl([0, E, E, E, C]),
     w: handWeights({ curl: [0, 1, 1, 1, 1] }), // thumb ignored
   },
   {
