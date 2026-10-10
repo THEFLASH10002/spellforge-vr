@@ -16,14 +16,14 @@ const SPHERE_VERT = `varying vec3 vN; varying vec3 vV; varying vec3 vP;
   void main(){ vP = normalize(position); vN = normalize(normalMatrix * normal);
     vec4 mv = modelViewMatrix * vec4(position, 1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`;
 
-const coreMat = () => new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uCharge: { value: 0 } }, ...ADD, vertexShader: SPHERE_VERT,
-  fragmentShader: `${NOISE} uniform float uTime; uniform float uCharge; varying vec3 vN; varying vec3 vV; varying vec3 vP;
+const coreMat = pal => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uCharge: { value: 0 }, uA: { value: new THREE.Color(pal.coreA) }, uB: { value: new THREE.Color(pal.coreB) } }, ...ADD, vertexShader: SPHERE_VERT,
+  fragmentShader: `${NOISE} uniform float uTime; uniform float uCharge; uniform vec3 uA; uniform vec3 uB; varying vec3 vN; varying vec3 vV; varying vec3 vP;
     void main(){
       float facing = abs(dot(normalize(vN), normalize(vV)));
       vec2 uv = vec2(atan(vP.z, vP.x) * 2.0 + uTime * 1.5, vP.y * 3.0);
       float nz = n(uv * 2.0 + uTime) * 0.5 + n(uv * 5.0 - uTime * 1.3) * 0.5;
-      vec3 c = mix(vec3(0.06, 0.4, 1.0), vec3(0.7, 0.92, 1.0), 0.7 * pow(facing, 6.0 - uCharge * 1.5)); // electric blue, small hot center (never pure white)
+      vec3 c = mix(uA, uB, 0.7 * pow(facing, 6.0 - uCharge * 1.5)); // electric blue, small hot center (never pure white)
       gl_FragColor = vec4(c * (0.65 + uCharge * 0.15) * (0.7 + 0.45 * nz), 0.9);
       #include <colorspace_fragment>
     }`,
@@ -43,23 +43,25 @@ const auraMat = (pow, ns, speed, color, alpha) => new THREE.ShaderMaterial({
     }`,
 });
 
-const ribbonMat = (dash, speed, alpha) => new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uCharge: { value: 0 }, uDash: { value: dash }, uSpd: { value: speed }, uAlpha: { value: alpha } },
+const ribbonMat = (dash, speed, alpha, pal) => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uCharge: { value: 0 }, uDash: { value: dash }, uSpd: { value: speed }, uAlpha: { value: alpha }, uA: { value: new THREE.Color(pal.ribA) }, uB: { value: new THREE.Color(pal.ribB) } },
   ...ADD, side: THREE.DoubleSide,
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: `uniform float uTime; uniform float uCharge; uniform float uDash; uniform float uSpd; uniform float uAlpha; varying vec2 vUv;
+  fragmentShader: `uniform float uTime; uniform float uCharge; uniform float uDash; uniform float uSpd; uniform float uAlpha; uniform vec3 uA; uniform vec3 uB; varying vec2 vUv;
     void main(){
       float d = fract(vUv.x * uDash - uTime * uSpd);
-      gl_FragColor = vec4(mix(vec3(0.15, 0.65, 1.0), vec3(0.9, 1.0, 1.0), d * d), pow(d, 3.0) * uAlpha * (0.5 + uCharge));
+      gl_FragColor = vec4(mix(uA, uB, d * d), pow(d, 3.0) * uAlpha * (0.5 + uCharge));
       #include <colorspace_fragment>
     }`,
 });
 
-const particleMat = () => new THREE.ShaderMaterial({
-  uniforms: { uTime: { value: 0 }, uCharge: { value: 0 }, uSize: { value: 0.32 }, uScale: { value: 0.05 }, uDust: { value: 0 }, uDustY: { value: 0 } },
+const particleMat = pal => new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 }, uCharge: { value: 0 }, uSize: { value: 0.32 }, uScale: { value: 0.05 }, uDust: { value: 0 }, uDustY: { value: 0 },
+    uOut: { value: pal.out ? 1 : 0 }, uA: { value: new THREE.Color(pal.partA) }, uB: { value: new THREE.Color(pal.partB) }, uS: { value: new THREE.Color(pal.spark) } },
   ...ADD,
   vertexShader: `attribute vec4 aSeed; attribute float aKind;
     uniform float uTime; uniform float uCharge; uniform float uSize; uniform float uScale; uniform float uDust; uniform float uDustY;
+    uniform float uOut; uniform vec3 uA; uniform vec3 uB; uniform vec3 uS;
     varying vec3 vCol; varying float vA;
     vec3 rot(vec3 v, vec3 k, float a){ return v * cos(a) + cross(k, v) * sin(a) + k * dot(k, v) * (1.0 - cos(a)); }
     void main(){
@@ -69,15 +71,16 @@ const particleMat = () => new THREE.ShaderMaterial({
       vec3 dir = vec3(s2 * cos(th), cp, s2 * sin(th));
       vec3 axis = normalize(vec3(sin(aSeed.x * 17.0), 1.0, cos(aSeed.y * 13.0)));
       vec3 p; float size = uSize; vA = 1.0;
-      if (aKind < 0.5) { // spiral inward (space compressing)
-        float r = (2.2 + aSeed.z * 2.6) * (1.0 - ph);
-        p = rot(dir, axis, ph * (5.0 + uCharge * 9.0) * (1.0 + aSeed.w)) * r;
-        vCol = mix(vec3(0.2, 0.75, 1.0), vec3(1.0), ph); vA = smoothstep(0.0, 0.1, ph) * (0.35 + 0.65 * ph);
+      if (aKind < 0.5) { // spiral inward (space compressing) - or outward when uOut = 1 (repulsion)
+        float q = mix(ph, 1.0 - ph, uOut);
+        float r = (2.2 + aSeed.z * 2.6) * (1.0 - q);
+        p = rot(dir, axis, ph * (5.0 + uCharge * 9.0) * (1.0 + aSeed.w) * mix(1.0, -1.0, uOut)) * r;
+        vCol = mix(uA, uB, q); vA = smoothstep(0.0, 0.1, ph) * (0.35 + 0.65 * q) * mix(1.0, 1.0 - smoothstep(0.7, 1.0, ph), uOut);
       } else if (aKind < 1.5) { // sparks shoot out, get pulled back
         float r = 1.0 + 2.8 * sin(ph * 3.14159);
-        p = rot(dir, axis, ph * 3.0) * r; vCol = vec3(0.6, 0.9, 1.0); vA = 0.9 * sin(ph * 3.14159); size *= 0.7;
+        p = rot(dir, axis, ph * 3.0) * r; vCol = uS; vA = 0.9 * sin(ph * 3.14159); size *= 0.7;
       } else { // ground dust spiraling in (singularity only)
-        float a = aSeed.z * 6.2832 + ph * 5.0, r = (1.0 - ph) * 3.2 / uScale + 0.5;
+        float a = aSeed.z * 6.2832 + ph * 5.0, r = mix(1.0 - ph, ph, uOut) * 3.2 / uScale + 0.5;
         p = vec3(cos(a) * r, -uDustY + aSeed.w * 0.5 / uScale, sin(a) * r);
         vCol = vec3(0.78, 0.7, 0.55); vA = uDust * smoothstep(0.0, 0.15, ph) * (1.0 - ph) * 0.7; size *= 3.0;
       }
@@ -95,14 +98,17 @@ const particleMat = () => new THREE.ShaderMaterial({
     }`,
 });
 
-export function createOrb() {
+export const PAL_BLUE = { coreA: 0x0f66ff, coreB: 0xb3ebff, aura1: 0x1f7fff, aura2: 0x4fc8ff, ribA: 0x26a6ff, ribB: 0xe6ffff, partA: 0x33bfff, partB: 0xffffff, spark: 0x99e6ff, halo: 0x2f8fff, out: false };
+export const PAL_RED = { coreA: 0xff1a0a, coreB: 0xffd2a0, aura1: 0xff2a14, aura2: 0xff8a3a, ribA: 0xff3a1a, ribB: 0xfff0d0, partA: 0xff3a22, partB: 0xffe0b0, spark: 0xffa060, halo: 0xff3a14, out: true };
+
+export function createOrb(pal = PAL_BLUE) {
   const group = new THREE.Group();
   const mats = [];
   const reg = m => { mats.push(m); return m; };
 
-  const core = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), reg(coreMat()));
-  const aura1 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 20, 14), reg(auraMat(1.6, 3.0, 1.2, 0x1f7fff, 0.6)));
-  const aura2 = new THREE.Mesh(new THREE.SphereGeometry(2.1, 20, 14), reg(auraMat(2.6, 2.0, -0.8, 0x4fc8ff, 0.4)));
+  const core = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), reg(coreMat(pal)));
+  const aura1 = new THREE.Mesh(new THREE.SphereGeometry(1.5, 20, 14), reg(auraMat(1.6, 3.0, 1.2, pal.aura1, 0.6)));
+  const aura2 = new THREE.Mesh(new THREE.SphereGeometry(2.1, 20, 14), reg(auraMat(2.6, 2.0, -0.8, pal.aura2, 0.4)));
   group.add(core, aura1, aura2);
 
   // Spinning dashed rings: first three read as energy ribbons, the thin outer ones as wind streaks.
@@ -111,12 +117,12 @@ export function createOrb() {
    [2.8, 0.014, 9, 2.6, 0.6], [3.4, 0.012, 11, -3.1, 0.5], [4.0, 0.01, 13, 3.6, 0.4]].forEach(([r, w, dash, spin, alpha], i) => {
     const holder = new THREE.Group();
     holder.rotation.set(i * 0.9 + 0.3, i * 1.7, i * 0.6);
-    const m = new THREE.Mesh(new THREE.TorusGeometry(r, w, 4, 64), reg(ribbonMat(dash, 0.7 + i * 0.15, alpha)));
+    const m = new THREE.Mesh(new THREE.TorusGeometry(r, w, 4, 64), reg(ribbonMat(dash, 0.7 + i * 0.15, alpha, pal)));
     holder.add(m); group.add(holder);
     rings.push({ m, spin });
   });
 
-  const halo = makeHalo(0x2f8fff, 6);
+  const halo = makeHalo(pal.halo, 6);
   group.add(halo);
 
   const counts = FULL ? [150, 40, 40] : [90, 24, 24];
@@ -130,7 +136,7 @@ export function createOrb() {
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(total * 3), 3)); // unused; positions come from the shader
   geo.setAttribute('aSeed', new THREE.BufferAttribute(seed, 4));
   geo.setAttribute('aKind', new THREE.BufferAttribute(kind, 1));
-  const pm = reg(particleMat());
+  const pm = reg(particleMat(pal));
   const pts = new THREE.Points(geo, pm);
   pts.frustumCulled = false;
   group.add(pts);

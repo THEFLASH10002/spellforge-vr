@@ -22,7 +22,7 @@ export class Grass {
     geo.instanceCount = count;
 
     this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uTime: { value: 0 }, uWell: { value: new THREE.Vector4() }, uGlow: { value: new THREE.Vector4() }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
+      uTime: { value: 0 }, uWell: { value: new THREE.Vector4() }, uGlow: { value: new THREE.Vector4() }, uGlowCol: { value: new THREE.Color(0x1466ff) }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
       uBase: { value: new THREE.Color(0x2f5e1e) }, uTip: { value: new THREE.Color(0x9ad258) },
     }]);
     const mat = new THREE.ShaderMaterial({
@@ -45,10 +45,10 @@ export class Grass {
           gl_Position = projectionMatrix * mvPosition;
           #include <fog_vertex>
         }`,
-      fragmentShader: `uniform vec3 uTint; uniform vec3 uBase; uniform vec3 uTip; varying float vTip; varying float vShade; varying float vGlow;
+      fragmentShader: `uniform vec3 uTint; uniform vec3 uBase; uniform vec3 uTip; uniform vec3 uGlowCol; varying float vTip; varying float vShade; varying float vGlow;
         #include <fog_pars_fragment>
         void main(){
-          vec3 col = mix(uBase, uTip, vTip) * uTint * vShade + vec3(0.08, 0.4, 1.0) * vGlow * (0.4 + 0.6 * vTip);
+          vec3 col = mix(uBase, uTip, vTip) * uTint * vShade + uGlowCol * vGlow * (0.4 + 0.6 * vTip);
           gl_FragColor = vec4(col, 1.0);
           #include <colorspace_fragment>
           #include <fog_fragment>

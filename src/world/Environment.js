@@ -128,17 +128,21 @@ export class Environment {
   }
 
   // Gravity Well mood: blue spill on the grass near `pos` (k 0..1).
-  setGlow(pos, k) { this.grass.uniforms.uGlow.value.set(pos.x, pos.y, pos.z, k); }
+  setGlow(pos, k, color) { this.grass.uniforms.uGlow.value.set(pos.x, pos.y, pos.z, k); if (color) this.grass.uniforms.uGlowCol.value.copy(color); }
 
   // Gravity Well mood (only while the Sanctum is not active): darken grass/mountains, tint petals blue.
-  setMoodTint(m) {
+  setMoodTint(m, dark = MOOD_DARK, petal = MOOD_BLUE) {
     this.grass.uniforms.uTint.value.copy(this.grassBase).multiplyScalar(1 - 0.45 * m);
-    for (const mt of this.mountains) mt.mat.color.copy(mt.base).lerp(MOOD_DARK, 0.6 * m);
-    this.petals.setTint(MOOD_BLUE, 0.5 * m);
+    for (const mt of this.mountains) mt.mat.color.copy(mt.base).lerp(dark, 0.6 * m);
+    this.petals.setTint(petal, 0.5 * m);
   }
 
   // Attract petals + grass toward `pos` with strength k (0..1). Pass (null, 0) to release.
-  setWell(pos, k) { if (pos) this.wellPos.copy(pos); this.wellT = k; }
+  // k < 0 repels (Repulsor). `owner` stops an idle spell releasing a well another spell is holding.
+  setWell(pos, k, owner = 'default') {
+    if (k !== 0) { this.wellOwner = owner; if (pos) this.wellPos.copy(pos); this.wellT = k; }
+    else if (this.wellOwner === owner || !this.wellOwner) this.wellT = 0;
+  }
 
   // Spell reactions: casting pulls petals in then bursts them; Repel Palm also gusts the wind.
   onSpell(pos, kind) {

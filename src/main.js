@@ -23,7 +23,7 @@ import { AssetManager } from './assets/AssetManager.js';
 import { buildTerrain, buildTrainingGround, terrainHeight, onPath, PADS, FLAT } from './world/Terrain.js';
 import { Grass } from './world/Grass.js';
 import { Environment } from './world/Environment.js';
-import { GravityWell, WELL } from './arts/GravityWell.js';
+import { GravityWell, WELL, RED, RED_VARIANT } from './arts/GravityWell.js';
 import { WellMood, MOOD } from './vfx/WellMood.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
@@ -81,15 +81,18 @@ caster.env = env;
 const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
-const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); } });
+const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); } });
 let lastCast = '-';
 let nextArt = 0;
-const well = new GravityWell({ scene, physics, env, targets });
-const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum });
+const well = new GravityWell({ scene, physics, env, targets });            // Blue: pulls
+const red = new GravityWell({ scene, physics, env, targets, variant: RED_VARIANT }); // Red: repels
+well.other = red; red.other = well;
+const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red] });
 recognizer.onCast = (sigil, hand, which) => {
-  lastCast = `${sigil.name} (${sigil.artId})`;
+  lastCast = sigil.name;
   if (sigil.artId === 'sanctum') sanctum.activate(presetIdx, ruleIdx);
   else if (sigil.artId === 'well') well.begin(which); // hold + charge + throw (see GravityWell.js)
+  else if (sigil.artId === 'repulsor') red.begin(which);
   else caster.cast(sigil.artId, hand);
 };
 
@@ -109,6 +112,9 @@ panel.addButton({ label: 'Clear Custom', x: 262, y: 450, w: 240, h: 70, onPress:
 // Gravity Well fallbacks: start charging without the hand sign, and launch without a throw.
 panel.addButton({ label: 'Well: Charge', x: 10, y: 610, w: 240, h: 70, onPress: () => well.begin('right') });
 panel.addButton({ label: 'Well: Launch', x: 262, y: 610, w: 240, h: 70, onPress: () => well.launchNow() });
+
+panel.addButton({ label: 'Red: Charge', x: 10, y: 690, w: 240, h: 70, onPress: () => red.begin('left') });
+panel.addButton({ label: 'Red: Launch', x: 262, y: 690, w: 240, h: 70, onPress: () => red.launchNow() });
 
 // Forge: name / rebind the most recent custom Sigil.
 const ADJ = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron'];
@@ -139,7 +145,7 @@ function updateHud(dt, R) {
   panel.setLines([
     'SpellForge',
     rec,
-    `Cast: ${lastCast} | Well: ${well.status}`,
+    `${lastCast} | Blue ${well.status} | Red ${red.status}`,
     dbg ? `Best: ${dbg.sg.name} ${dbg.ratio.toFixed(2)} (<1 fires)` : 'Best: no hands',
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
     `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
@@ -167,18 +173,23 @@ renderer.setAnimationLoop(() => {
   const headInv = headQ.clone().invert();
   const lh = handBy('left'), rh = handBy('right');
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
-  if (recorder.active) recorder.update(dt, L, R, headInv); else if (!well.active) recognizer.update(dt, L, R, headInv);
+  if (recorder.active) recorder.update(dt, L, R, headInv); else {
+    // A hand that is holding an orb is busy; the other hand can still sign (so you can hold Blue and Red together).
+    const busy = h => (well.active && well.which === h) || (red.active && red.which === h);
+    recognizer.update(dt, busy('left') ? null : L, busy('right') ? null : R, headInv);
+  }
   well.update(dt, headPos, headQ, L, R);
+  red.update(dt, headPos, headQ, L, R);
   caster.update(dt, headPos);
   fx.update(dt);
   env.update(dt, clock.elapsedTime, headPos);
   district.update(dt * sanctum.timeScale);
   sanctum.update(dt);
-  mood.update(dt, well); // after the Sanctum so it can modulate (or restore) the look
+  mood.update(dt); // after the Sanctum so it can modulate (or restore) the look
   for (const p of puppets) p.update(dt, clock.elapsedTime);
   panel.poke([L?.tip, R?.tip], performance.now());
   updateHud(dt, R);
   renderer.render(scene, camera);
 });
 
-window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL, mood, MOOD }; // debug/test hook
+window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, mood, MOOD }; // debug/test hook

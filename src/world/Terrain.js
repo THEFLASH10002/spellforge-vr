@@ -21,14 +21,23 @@ export function vnoise(x, z) {
   return lerp(lerp(hash(i, j), hash(i + 1, j), u), lerp(hash(i, j + 1), hash(i + 1, j + 1), u), v);
 }
 
-export function terrainHeight(x, z) {
+// Ground without pads. The arena (r < FLAT) is dead flat at y = 0; from there the land rises gently and
+// unevenly (higher toward the town ahead, low behind) so the arena reads as a clearing, not a pit.
+function baseHeight(x, z) {
   const r = Math.hypot(x, z);
-  const t = ss(FLAT, RISE_END, r);
-  let y = t * PLATEAU + t * (vnoise(x * 0.09, z * 0.09) - 0.5) * 1.2;
-  y += ss(30, 52, r) * (7 + vnoise(x * 0.06 + 9, z * 0.06) * 6);
-  for (const p of PADS) {
+  const front = 0.5 + 0.5 * Math.cos(Math.atan2(x, -z)); // 1 straight ahead (the town), 0 behind
+  const peak = 0.9 + 2.3 * front * front;                 // ~3.2 m ahead, ~0.9 m behind
+  const t = ss(FLAT, 32, r);                              // long, gentle rise
+  let y = t * peak + t * (vnoise(x * 0.07, z * 0.07) - 0.5) * 1.4;
+  y += ss(34, 56, r) * (5 + vnoise(x * 0.05 + 9, z * 0.05) * 7); // backdrop hills farther out
+  return y;
+}
+
+export function terrainHeight(x, z) {
+  let y = baseHeight(x, z);
+  for (const p of PADS) { // flatten building pads to the local ground level at their centre
     const m = 1 - ss(p.r, p.r + 4, Math.hypot(x - p.x, z - p.z));
-    if (m > 0) y = lerp(y, PLATEAU, m);
+    if (m > 0) y = lerp(y, baseHeight(p.x, p.z), m);
   }
   return y;
 }

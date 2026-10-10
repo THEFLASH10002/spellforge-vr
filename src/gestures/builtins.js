@@ -42,5 +42,11 @@ export const BUILTINS = [
     vec: tpl([0, E, C, C, C]),
     w: handWeights({ curl: [0, 1, 1, 1, 1] }),
   },
+  {
+    // Rock sign: index + pinky out, middle/ring curled (thumb ignored). Starts charging the Repulsor.
+    id: 'repulsor', name: 'Repulsor', hand: 'any', artId: 'repulsor', builtin: true, thresh: 0.12,
+    vec: tpl([0, E, C, C, E]),
+    w: handWeights({ curl: [0, 1, 1, 1, 1] }),
+  },
   sanctumSigil(),
 ];

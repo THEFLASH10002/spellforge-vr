@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createOrb } from '../vfx/Singularity.js';
+import { createOrb, PAL_BLUE, PAL_RED } from '../vfx/Singularity.js';
 import { fx, Trail } from '../vfx/Effects.js';
 import { terrainHeight } from '../world/Terrain.js';
 
@@ -29,14 +29,27 @@ export const WELL = {
   maxDebris: 200,        // cap on active debris bodies
 };
 
+// Red = the repelling counterpart: same hold / charge / throw, but the field pushes outward and the impact is a blast.
+export const RED = { ...WELL, force: 22, singularity: 1.4, destroyBase: 2.4, destroyPerCharge: 2.4, blastRadius: 6, blast: 13 };
+
+export const BLUE_VARIANT = {
+  id: 'well', sign: 1, cfg: WELL, pal: PAL_BLUE, color: 0x5ac8ff, light: 0x9fe0ff,
+  mood: { light: 0x3a8cff, tint: 0x2f6cff, deep: 0x081230, sky: 0x14307a, petal: 0x5aa0ff, glow: 0x1466ff },
+};
+export const RED_VARIANT = {
+  id: 'repulsor', sign: -1, cfg: RED, pal: PAL_RED, color: 0xff4a2a, light: 0xffc090,
+  mood: { light: 0xff3a1a, tint: 0xff4a28, deep: 0x1a0408, sky: 0x4a0c14, petal: 0xff7a60, glow: 0xff3a14 },
+};
+
 const smooth = x => x * x * (3 - 2 * x);
 const clamp01 = x => Math.min(1, Math.max(0, x));
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class GravityWell {
-  constructor({ scene, physics, env, targets }) {
+  constructor({ scene, physics, env, targets, variant = BLUE_VARIANT }) {
     Object.assign(this, { scene, physics, env, targets });
-    this.orb = createOrb();
+    this.v = variant; this.cfg = variant.cfg; this.other = null; // other: the sibling spell (so both can't claim one hand)
+    this.orb = createOrb(variant.pal);
     this.orb.group.visible = false;
     scene.add(this.orb.group);
     this.state = 'idle'; this.which = 'right'; this.t = 0; this.clock = 0; this.cool = 0;
@@ -51,7 +64,9 @@ export class GravityWell {
 
   begin(which) {
     if (this.state !== 'idle' || this.cool > 0) return;
-    this.which = which === 'left' ? 'left' : 'right'; // two-hand custom Sigils charge the right hand
+    const hand = which === 'left' ? 'left' : 'right';
+    if (this.other?.active && this.other.which === hand) return; // that hand is already holding the other orb
+    this.which = hand; // two-hand custom Sigils charge the right hand
     this.state = 'charging'; this.t = 0; this.hist = []; this.fast = 0; this.lost = 0; this.first = true; this.pulse = 0;
     this.orb.group.visible = true;
   }
@@ -65,7 +80,7 @@ export class GravityWell {
     if (this.state === 'charging') this.charging(dt, head, L, R);
     else if (this.state === 'flying') this.flying(dt, head);
     else if (this.state === 'singularity') this.singularity(dt);
-    else { this.status = this.cool > 0 ? 'cooling' : 'ready'; this.env.setWell(null, 0); }
+    else { this.status = this.cool > 0 ? 'cooling' : 'ready'; this.env.setWell(null, (0) * this.v.sign, this.v.id); }
   }
 
   // ---- charging ----------------------------------------------------------------------------------
@@ -74,28 +89,28 @@ export class GravityWell {
     if (hand) {
       this.lost = 0;
       // Above the fingertip in world-up (the palm normal points sideways in the pointer pose).
-      const target = this.tmp.copy(hand.tip).addScaledVector(UP, WELL.hover);
-      if (this.first) { this.pos.copy(target); this.first = false; } else this.pos.lerp(target, 1 - Math.exp(-WELL.smooth * dt));
+      const target = this.tmp.copy(hand.tip).addScaledVector(UP, this.cfg.hover);
+      if (this.first) { this.pos.copy(target); this.first = false; } else this.pos.lerp(target, 1 - Math.exp(-this.cfg.smooth * dt));
       this.hist.push({ t: this.clock, p: hand.wrist.clone() });
       while (this.hist.length > 2 && this.clock - this.hist[0].t > 0.35) this.hist.shift();
     } else if ((this.lost += dt) > 0.8) { this.collapse(false); return; }
 
     this.t += dt;
-    const c = (this.charge = clamp01(this.t / WELL.chargeTime));
-    this.mult = 1 + (WELL.maxMult - 1) * c;
+    const c = (this.charge = clamp01(this.t / this.cfg.chargeTime));
+    this.mult = 1 + (this.cfg.maxMult - 1) * c;
     const radius = 0.02 + 0.07 * smooth(c);
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, c, radius);
     this.status = `charging ${Math.round(c * 100)}%`;
     this.moodTarget = 0.15 + 0.6 * c; // the world darkens and turns blue as it charges
 
-    if ((this.pulse -= dt) <= 0 && c > 0.4) { fx.shock(this.pos, UP, 0x5ac8ff, 0.8 + c); this.pulse = 0.9 - 0.5 * c; }
+    if ((this.pulse -= dt) <= 0 && c > 0.4) { fx.shock(this.pos, UP, this.v.color, 0.8 + c); this.pulse = 0.9 - 0.5 * c; }
     // Light objects near the hand lean toward the forming orb; petals start to stream in.
-    this.field(this.pos, 1.5 + 1.5 * c, 0.6, WELL.force * 0.25 * c, dt);
-    this.env.setWell(this.pos, 0.25 + 0.35 * c);
+    this.field(this.pos, 1.5 + 1.5 * c, 0.6, this.cfg.force * 0.25 * c, dt);
+    this.env.setWell(this.pos, (0.25 + 0.35 * c) * this.v.sign, this.v.id);
 
-    if (hand && this.t > WELL.minHold) this.detectThrow(hand, head);
-    if (this.t > WELL.maxHold) this.launch(this.headFwd.clone());
+    if (hand && this.t > this.cfg.minHold) this.detectThrow(hand, head);
+    if (this.t > this.cfg.maxHold) this.launch(this.headFwd.clone());
   }
 
   // Smoothed hand velocity over ~0.14 s; deliberate forward motion (or a forward arm push) throws.
@@ -108,7 +123,7 @@ export class GravityWell {
     const v = this.tmp.copy(last.p).sub(first.p).divideScalar(span), speed = v.length();
     const dot = speed > 1e-3 ? v.dot(this.headFwd) / speed : 0;
     const ext = hand.wrist.clone().sub(head).dot(this.headFwd);
-    const throwing = (speed >= WELL.throwMinSpeed && dot >= WELL.throwDot) || (ext >= WELL.armExtend && v.dot(this.headFwd) >= WELL.armSpeed);
+    const throwing = (speed >= this.cfg.throwMinSpeed && dot >= this.cfg.throwDot) || (ext >= this.cfg.armExtend && v.dot(this.headFwd) >= this.cfg.armSpeed);
     this.fast = throwing ? this.fast + 1 : 0;
     if (this.fast >= 2) { // debounce: two consecutive frames
       const d = v.clone().normalize().multiplyScalar(0.75).addScaledVector(this.headFwd, 0.25).normalize(); // blend toward gaze to help aim
@@ -117,15 +132,15 @@ export class GravityWell {
   }
 
   launch(dir) {
-    this.state = 'flying'; this.dir.copy(dir); this.life = WELL.lifetime; this.cool = WELL.cooldown; this.hist = []; this.fast = 0;
-    this.trail = new Trail(this.scene, 0x5ac8ff, 20);
-    fx.burst(this.pos, 0x9fe0ff, 30, 3);
-    fx.shock(this.pos, dir, 0x5ac8ff, 1.5);
+    this.state = 'flying'; this.dir.copy(dir); this.life = this.cfg.lifetime; this.cool = this.cfg.cooldown; this.hist = []; this.fast = 0;
+    this.trail = new Trail(this.scene, this.v.color, 20);
+    fx.burst(this.pos, this.v.light, 30, 3);
+    fx.shock(this.pos, dir, this.v.color, 1.5);
   }
 
   // ---- flight --------------------------------------------------------------------------------------
   flying(dt, head) {
-    const c = this.charge, radius = 0.07 + 0.05 * c, step = WELL.speed * dt, R = this.physics.R;
+    const c = this.charge, radius = 0.07 + 0.05 * c, step = this.cfg.speed * dt, R = this.physics.R;
     const ray = new R.Ray({ x: this.pos.x, y: this.pos.y, z: this.pos.z }, { x: this.dir.x, y: this.dir.y, z: this.dir.z });
     const hit = this.physics.world.castRay(ray, step + radius, true, R.QueryFilterFlags.EXCLUDE_DYNAMIC);
     if (hit) {
@@ -140,9 +155,9 @@ export class GravityWell {
     this.orb.update(this.clock, dt, Math.max(c, 0.5), radius);
     this.trail.push(this.pos);
     this.trail.update(head, 0.05 + 0.05 * c);
-    fx.burst(this.pos, 0x7fd8ff, 2, 0.8);
-    this.field(this.pos, WELL.radius * 0.7, WELL.strongRadius * 0.6, WELL.force * 0.5 * this.mult, dt); // pulls debris/ragdolls along the way
-    this.env.setWell(this.pos, 0.6);
+    fx.burst(this.pos, this.v.light, 2, 0.8);
+    this.field(this.pos, this.cfg.radius * 0.7, this.cfg.strongRadius * 0.6, this.cfg.force * 0.5 * this.mult, dt); // pulls debris/ragdolls along the way
+    this.env.setWell(this.pos, (0.6) * this.v.sign, this.v.id);
     this.status = 'flying';
     this.moodTarget = 0.85;
     if ((this.life -= dt) <= 0) this.impact();
@@ -151,11 +166,12 @@ export class GravityWell {
   // ---- impact / singularity -----------------------------------------------------------------------
   impact() {
     this.state = 'singularity'; this.sT = 0; this.second = false;
-    this.singT = WELL.singularity * (0.8 + 0.2 * this.mult);
+    this.singT = this.cfg.singularity * (0.8 + 0.2 * this.mult);
     this.trail?.dispose(); this.trail = null;
-    fx.shock(this.pos, UP, 0x5ac8ff, 4 + 2 * this.charge);
-    fx.burst(this.pos, 0xbfe9ff, 40, 5);
-    this.destroyNear(WELL.destroyBase + WELL.destroyPerCharge * this.charge);
+    fx.shock(this.pos, UP, this.v.color, 4 + 2 * this.charge);
+    fx.burst(this.pos, this.v.light, 40, 5);
+    if (this.v.sign < 0) this.blast();
+    this.destroyNear(this.cfg.destroyBase + this.cfg.destroyPerCharge * this.charge);
   }
 
   // Shatter pieces within `r` of the anchor (distance to the piece's bounds, so large walls count).
@@ -165,26 +181,31 @@ export class GravityWell {
       let d;
       if (t.center) d = t.center.distanceTo(this.pos);
       else { t.bounds ||= new THREE.Box3().setFromObject(t.mesh); d = t.bounds.distanceToPoint(this.pos); }
-      if (d < r) t.shatter(this.pos, UP, 6, true); // pull = fragments / ragdoll parts head for the singularity
+      if (d >= r) continue;
+      if (this.v.sign > 0) t.shatter(this.pos, UP, 6, true); // pull = fragments / ragdoll parts head for the singularity
+      else { // repel: everything is thrown away from the orb
+        const c = t.center || t.mesh.position;
+        t.shatter(this.pos, this.tmp.copy(c).sub(this.pos).setY(0.4).normalize().clone(), 12 + 6 * this.charge, false);
+      }
     }
   }
 
   singularity(dt) {
     this.sT += dt;
     const c = this.charge, k = this.sT / this.singT;
-    const intens = 1 + 1.2 * smooth(clamp01(this.sT / 0.4));
-    const radius = WELL.radius * (0.7 + 0.3 * this.mult);
-    this.field(this.pos, radius, WELL.strongRadius * (0.8 + 0.2 * this.mult), WELL.force * this.mult * intens, dt);
-    this.env.setWell(this.pos, 1);
-    if (!this.second && this.sT > 0.9) { this.second = true; this.destroyNear((WELL.destroyBase + WELL.destroyPerCharge * c) * 1.5); }
+    const intens = this.v.sign > 0 ? 1 + 1.2 * smooth(clamp01(this.sT / 0.4)) : 1.4 * (1 - k); // pull builds; push is a decaying shove
+    const radius = this.cfg.radius * (0.7 + 0.3 * this.mult);
+    this.field(this.pos, radius, this.cfg.strongRadius * (0.8 + 0.2 * this.mult), this.cfg.force * this.mult * intens, dt);
+    this.env.setWell(this.pos, (1) * this.v.sign, this.v.id);
+    if (!this.second && this.v.sign > 0 && this.sT > 0.9) { this.second = true; this.destroyNear((this.cfg.destroyBase + this.cfg.destroyPerCharge * c) * 1.5); }
 
     // Enemies still standing struggle toward the orb; the ones dragged into the strong radius ragdoll.
     for (const t of this.targets) {
-      if (t.broken || !t.struggle) continue;
+      if (this.v.sign < 0 || t.broken || !t.struggle) continue;
       const d = t.center.distanceTo(this.pos);
       if (d < radius * 1.3) {
         t.struggle(this.tmp.copy(this.pos).sub(t.center).setY(0).normalize(), clamp01(1 - d / (radius * 1.3)));
-        if (d < WELL.strongRadius * 0.9) t.shatter(this.pos, UP, 5, true);
+        if (d < this.cfg.strongRadius * 0.9) t.shatter(this.pos, UP, 5, true);
       }
     }
 
@@ -200,23 +221,35 @@ export class GravityWell {
 
   collapse(flash) {
     if (flash) {
-      fx.burst(this.pos, 0xbfe9ff, 80, 7);
-      fx.shock(this.pos, UP, 0x6ac0ff, 6);
+      fx.burst(this.pos, this.v.light, 80, 7);
+      fx.shock(this.pos, UP, this.v.color, 6);
       this.env.onSpell(this.pos, 'cast'); // petals puff outward with the final flash
-      for (const e of this.physics.synced) { // brief outward release as it winks out
+      if (this.v.sign > 0) for (const e of this.physics.synced) { // brief outward release as it winks out
         if (e.projectile) continue;
         const t = e.body.translation(), dx = t.x - this.pos.x, dy = t.y - this.pos.y, dz = t.z - this.pos.z, d = Math.hypot(dx, dy, dz) + 1e-3;
         if (d < 4) { const k = (1 - d / 4) * e.body.mass() * 2.5 / d; e.body.applyImpulse({ x: dx * k, y: dy * k + 0.5 * k * d, z: dz * k }, true); }
       }
-    } else fx.burst(this.pos, 0x7fd8ff, 20, 2);
-    this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null; this.env.setWell(null, 0);
+    } else fx.burst(this.pos, this.v.light, 20, 2);
+    this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null; this.env.setWell(null, (0) * this.v.sign, this.v.id);
     this.status = 'ready'; this.cool = Math.max(this.cool, 0.3);
     this.moodTarget = 0; // WellMood eases the light back slowly (~2.5 s) after the blue is gone
   }
 
   reset() {
     this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null;
-    this.cool = 0; this.env.setWell(null, 0); this.status = 'ready'; this.moodTarget = 0;
+    this.cool = 0; this.env.setWell(null, (0) * this.v.sign, this.v.id); this.status = 'ready'; this.moodTarget = 0;
+  }
+
+  // Repel impact: an immediate outward shove on everything nearby (velocity change independent of mass, falling off with distance).
+  blast() {
+    const r = this.cfg.blastRadius, sp = this.cfg.blast * (0.6 + 0.4 * this.mult);
+    for (const e of this.physics.synced) {
+      if (e.projectile) continue;
+      const t = e.body.translation(), dx = t.x - this.pos.x, dy = t.y - this.pos.y, dz = t.z - this.pos.z, d = Math.hypot(dx, dy, dz) + 1e-3;
+      if (d > r) continue;
+      const f = 1 - d / r, m = e.body.mass(), k = (m * sp * f) / d;
+      e.body.applyImpulse({ x: dx * k, y: dy * k + m * sp * f * 0.35, z: dz * k }, true);
+    }
   }
 
   // ---- the force field -------------------------------------------------------------------------------
@@ -232,9 +265,9 @@ export class GravityWell {
       let f = 1 - d / radius; f *= f;
       if (d < strong) f *= 2.2;
       const m = Math.max(b.mass(), 0.05);
-      const acc = Math.min(strength * f / (0.4 + m * 0.5), WELL.accCap), k = (m * acc * dt) / d;
+      const acc = Math.min(strength * f / (0.4 + m * 0.5), this.cfg.accCap), k = (this.v.sign * m * acc * dt) / d;
       b.applyImpulse({ x: dx * k + dz * k * 0.3, y: dy * k, z: dz * k - dx * k * 0.3 }, true); // pull + a little swirl
-      if (d < 0.7) { const v = b.linvel(); b.setLinvel({ x: v.x * 0.92, y: v.y * 0.92, z: v.z * 0.92 }, true); } // settle near the core
+      if (this.v.sign > 0 && d < 0.7) { const v = b.linvel(); b.setLinvel({ x: v.x * 0.92, y: v.y * 0.92, z: v.z * 0.92 }, true); } // settle near the core
     }
   }
 }

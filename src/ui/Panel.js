@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // World-space canvas panel with text lines and poke buttons (index fingertip within ~3.5 cm).
 export class Panel {
-  constructor({ w = 0.5, h = 0.703, px = 512, py = 720 } = {}) {
+  constructor({ w = 0.5, h = 0.781, px = 512, py = 800 } = {}) {
     this.w = w; this.h = h; this.px = px; this.py = py;
     this.canvas = document.createElement('canvas');
     this.canvas.width = px; this.canvas.height = py;
