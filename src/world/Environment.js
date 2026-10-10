@@ -31,7 +31,7 @@ export class Environment {
 
     // --- Cherry blossoms: GLB trees (glow + sway + variation come from the manifest), halos, petals ---
     const trees = treeSites().slice(0, QUALITY.trees);
-    assets.scatter(scene, 'tree', trees, { fitHeight: 6, sway: true, vary: true, glow: { color: '#ff7ab8', intensity: 0.45 } });
+    assets.scatter(scene, 'tree', trees, { fitHeight: 6, eraseRadius: 2.2, sway: true, vary: true, glow: { color: '#ff7ab8', intensity: 0.45 } });
     this.treeMats = assets.glowMats;
     this.baseEmissive = new THREE.Color(assets.manifest.slots.tree?.glow?.color || '#ff7ab8');
     this.haloMat = new THREE.SpriteMaterial({ map: glowTexture(), color: this.baseEmissive.clone(), opacity: 0.22, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false });
@@ -104,6 +104,7 @@ export class Environment {
     });
     if (im.instanceColor) im.instanceColor.needsUpdate = true;
     im.frustumCulled = false;
+    this.assets.registry.push({ im, points: pts, h: defaults.fitHeight || 1, r: defaults.eraseRadius ?? 0.8 });
     this.scene.add(im);
   }
 
@@ -115,6 +116,7 @@ export class Environment {
     const im = new THREE.InstancedMesh(geo, mat, pts.length), m = new THREE.Matrix4(), q = new THREE.Quaternion();
     pts.forEach(([x, z, , s = 1, y = 0], i) => im.setMatrixAt(i, m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s))));
     im.frustumCulled = false;
+    this.assets.registry.push({ im, points: pts, h: height, r: 0.4 });
     this.scene.add(im);
   }
 

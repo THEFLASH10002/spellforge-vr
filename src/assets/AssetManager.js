@@ -14,7 +14,8 @@ export class AssetManager {
   static async load() {
     const am = new AssetManager();
     am.swayTime = { value: 0 };  // shared wind clock for swaying instanced slots ("sway": true)
-    am.glowMats = [];            // blossom materials (slot option "glow") so the Sanctum can recolor them
+    am.glowMats = [];
+    am.registry = [];            // { im, points, h, r } for every instanced mesh, so individual instances can be erased            // blossom materials (slot option "glow") so the Sanctum can recolor them
     am.manifest = { slots: {}, decor: [] };
     try {
       const r = await fetch(url('assets/manifest.json'), { cache: 'no-cache' });
@@ -108,6 +109,7 @@ export class AssetManager {
       });
       if (im.instanceColor) im.instanceColor.needsUpdate = true;
       im.frustumCulled = false;
+      this.registry.push({ im, points, h: cfg.fitHeight || 1, r: cfg.eraseRadius ?? 1 });
       scene.add(im); n++;
     });
     return n;

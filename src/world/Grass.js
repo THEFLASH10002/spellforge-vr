@@ -22,15 +22,19 @@ export class Grass {
     geo.instanceCount = count;
 
     this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uTime: { value: 0 }, uWell: { value: new THREE.Vector4() }, uGlow: { value: new THREE.Vector4() }, uGlowCol: { value: new THREE.Color(0x1466ff) }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
+      uTime: { value: 0 }, uCuts: { value: Array.from({ length: 32 }, () => new THREE.Vector4()) }, uWell: { value: new THREE.Vector4() }, uGlow: { value: new THREE.Vector4() }, uGlowCol: { value: new THREE.Color(0x1466ff) }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
       uBase: { value: new THREE.Color(0x2f5e1e) }, uTip: { value: new THREE.Color(0x9ad258) },
     }]);
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms, side: THREE.DoubleSide, fog: true,
-      vertexShader: `attribute vec3 aOffset; attribute vec2 aRand; attribute float aTip; uniform float uTime; uniform vec4 uWell; uniform vec4 uGlow;
+      vertexShader: `attribute vec3 aOffset; attribute vec2 aRand; attribute float aTip; uniform float uTime; uniform vec4 uWell; uniform vec4 uGlow; uniform vec4 uCuts[32];
         varying float vTip; varying float vShade; varying float vGlow;
         #include <fog_pars_vertex>
         void main(){
+          for (int i = 0; i < 32; i++) { // Nullpoint path: blades inside a cut are clipped away
+            vec4 c = uCuts[i];
+            if (c.w > 0.5) { vec2 d = aOffset.xz - c.xy; if (dot(d, d) < c.z * c.z) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; } }
+          }
           float a = aRand.x * 6.2831; float s = sin(a), c = cos(a);
           vec3 p = position; p.y *= aRand.y * 0.9 + 0.2; float h = p.y;
           float w = sin(uTime * 1.7 + aOffset.x * 0.35 + aOffset.z * 0.27) * 0.2 * aTip * aTip * h;
@@ -59,4 +63,6 @@ export class Grass {
     scene.add(this.mesh);
   }
   update(t) { this.uniforms.uTime.value = t; }
+  setCut(i, x, z, r) { this.uniforms.uCuts.value[i].set(x, z, r, 1); }
+  clearCuts() { for (const v of this.uniforms.uCuts.value) v.set(0, 0, 0, 0); }
 }

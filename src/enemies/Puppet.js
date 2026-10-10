@@ -103,6 +103,11 @@ export class Puppet {
   }
 
   reset() {
+    if (this.erased) {
+      this.erased = false; this.broken = false; this.group.visible = true; this.group.scale.setScalar(1);
+      this.makeHitbox();
+      return;
+    }
     if (this.broken) {
       for (const part of Object.values(this.parts)) {
         this.physics.remove(part.mesh); // removes body, joints, and detaches mesh
@@ -116,6 +121,15 @@ export class Puppet {
     }
   }
 
+  // Nullpoint: vaporized outright (no ragdoll).
+  erase() {
+    if (this.broken) return;
+    this.broken = true; this.erased = true; this.erT = 0;
+    fx.burst(this.center, 0xc070ff, 24, 3);
+    this.physics.untag(this.hitbox);
+    this.physics.world.removeCollider(this.hitbox, true);
+  }
+
   // A standing puppet leans and shudders toward a pulling force (call every frame while pulled).
   struggle(dir, k) {
     this.pullDir ||= new THREE.Vector3();
@@ -123,6 +137,10 @@ export class Puppet {
   }
 
   update(dt, t) {
+    if (this.erased) {
+      if (this.erT < 1) { this.erT += dt / 0.35; this.group.scale.setScalar(Math.max(0, 1 - this.erT)); if (this.erT >= 1) this.group.visible = false; }
+      return;
+    }
     if (this.broken) return;
     const s = Math.sin(t * 1.6 + this.phase), lean = this.pullK || 0;
     this.group.rotation.z = s * 0.03 + (lean ? -this.pullDir.x * lean * 0.4 + Math.sin(t * 40) * lean * 0.02 : 0);

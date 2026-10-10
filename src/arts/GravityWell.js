@@ -71,6 +71,12 @@ export class GravityWell {
     this.orb.group.visible = true;
   }
 
+  // Merged into a Nullpoint: drop everything and cool down so this hand can't re-start immediately.
+  absorb() {
+    this.state = 'idle'; this.orb.group.visible = false; this.orb.setHorizon(0); this.trail?.dispose(); this.trail = null;
+    this.env.setWell(null, 0, this.v.id); this.moodTarget = 0; this.status = 'ready'; this.cool = 2.0;
+  }
+
   launchNow() { if (this.state === 'charging') this.launch(this.headFwd.clone()); }
 
   update(dt, head, headQ, L, R) {

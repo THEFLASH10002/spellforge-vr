@@ -22,7 +22,7 @@ export function buildDistrict(physics, scene, assets) {
     if (!skin) return;
     skin.position.set(x, oy, z);
     scene.add(skin);
-    let done = false;
+    let done = false, carved = false;
     for (const p of pieces) {
       p.mesh.visible = false;
       p.onShatter = (pt, dir, speed, pull) => {
@@ -30,7 +30,12 @@ export function buildDistrict(physics, scene, assets) {
         done = true; skin.visible = false;
         pieces.forEach((q, i) => { if (q !== p) q.pending.push({ t: 0.05 + i * 0.06, fn: () => q.shatter(pt, dir, speed * 0.6, pull) }); });
       };
-      p.onReset = () => { done = false; skin.visible = true; };
+      p.onCarve = () => { // a Nullpoint is cutting this structure: show the block stand-ins so a hole can be shown
+        if (carved) return;
+        carved = true; skin.visible = false;
+        for (const q of pieces) if (!q.carved && !q.broken) q.startCarve();
+      };
+      p.onReset = () => { done = false; carved = false; skin.visible = true; };
     }
   };
 

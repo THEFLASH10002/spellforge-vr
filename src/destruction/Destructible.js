@@ -44,11 +44,54 @@ export class Destructible {
     for (const e of this.live) this.physics.remove(e.mesh);
     this.live = []; this.pending = [];
     this.onReset?.();
-    if (!this.broken) return;
-    this.broken = false;
-    for (const f of this.frags) { f.position.copy(f.userData.home); f.quaternion.identity(); }
+    if (!this.broken && !this.carved) return;
+    this.broken = false; this.carved = false; this.vap = [];
+    for (const f of this.frags) {
+      if (f.userData.body) { this.physics.world.removeRigidBody(f.userData.body); f.userData.body = null; }
+      f.userData.gone = false; f.scale.setScalar(1); f.removeFromParent();
+      f.position.copy(f.userData.home); f.quaternion.identity();
+    }
     this.scene.add(this.mesh);
+    if (this.collider) { this.physics.untag(this.collider); this.physics.world.removeCollider(this.collider, true); }
     this.collider = this.physics.addFixedCollider(this.makeDesc(), this.position, this);
+  }
+
+  // ---- Nullpoint carving: punch a hole instead of shattering ---------------------------------------------
+  // Swap the intact mesh for its fragments as static pieces, then vaporize the ones inside the tube.
+  startCarve() {
+    if (this.carved || this.broken) return;
+    this.carved = true; this.vap = [];
+    if (this.collider) { this.physics.untag(this.collider); this.physics.world.removeCollider(this.collider, true); this.collider = null; }
+    this.mesh.removeFromParent();
+    this.onCarve?.(); // a GLB skin hides and the rest of its structure converts too
+    const R = this.physics.R;
+    for (const f of this.frags) {
+      this.scene.add(f);
+      if (f.userData.r === undefined) { f.geometry.computeBoundingSphere(); f.userData.r = f.geometry.boundingSphere.radius; }
+      const body = this.physics.world.createRigidBody(R.RigidBodyDesc.fixed().setTranslation(f.position.x, f.position.y, f.position.z));
+      let desc = R.ColliderDesc.convexHull(f.geometry.attributes.position.array);
+      if (!desc) desc = R.ColliderDesc.ball(f.userData.r);
+      this.physics.world.createCollider(desc.setFriction(0.8), body);
+      f.userData.body = body;
+    }
+  }
+
+  // Remove every fragment whose bounds touch the tube around segment a->b (radius r). Returns how many.
+  carve(a, b, r, segDist) {
+    if (this.broken) return 0;
+    this.startCarve();
+    let n = 0;
+    for (const f of this.frags) {
+      if (f.userData.gone) continue;
+      if (segDist(f.position, a, b) < r + f.userData.r * 0.6) {
+        f.userData.gone = true; n++;
+        if (f.userData.body) { this.physics.world.removeRigidBody(f.userData.body); f.userData.body = null; }
+        this.vap.push({ mesh: f, t: 0 });
+        fx.burst(f.position, 0xc070ff, 6, 2.5);
+      }
+    }
+    if (this.frags.every(f => f.userData.gone)) this.broken = true;
+    return n;
   }
 
   onHit(other) {
@@ -67,11 +110,12 @@ export class Destructible {
     this.broken = true;
     this.onShatter?.(point, dir, speed, pull); // lets a GLB skin hide and the rest of its structure follow
     fx.burst(point, 0xffe0a0, 28, 4);
-    this.physics.untag(this.collider);
-    this.physics.world.removeCollider(this.collider, true);
+    if (this.collider) { this.physics.untag(this.collider); this.physics.world.removeCollider(this.collider, true); this.collider = null; }
     this.mesh.removeFromParent();
     const R = this.physics.R;
     for (const f of this.frags) {
+      if (f.userData.gone) continue; // vaporized by a Nullpoint
+      if (f.userData.body) { this.physics.world.removeRigidBody(f.userData.body); f.userData.body = null; } // carved piece: fixed -> dynamic
       this.scene.add(f);
       const pos = f.geometry.attributes.position.array;
       const body = this.physics.world.createRigidBody(
@@ -96,6 +140,13 @@ export class Destructible {
   }
 
   update(dt) {
+    if (this.vap?.length) {
+      for (let i = this.vap.length - 1; i >= 0; i--) { // vaporize: shrink away
+        const v = this.vap[i]; v.t += dt / 0.45;
+        v.mesh.scale.setScalar(Math.max(0, 1 - v.t));
+        if (v.t >= 1) { v.mesh.removeFromParent(); this.vap.splice(i, 1); }
+      }
+    }
     for (let i = this.pending.length - 1; i >= 0; i--) {
       this.pending[i].t -= dt;
       if (this.pending[i].t <= 0) this.pending.splice(i, 1)[0].fn();

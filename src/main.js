@@ -25,6 +25,7 @@ import { Grass } from './world/Grass.js';
 import { Environment } from './world/Environment.js';
 import { GravityWell, WELL, RED, RED_VARIANT } from './arts/GravityWell.js';
 import { WellMood, MOOD } from './vfx/WellMood.js';
+import { NullOrb, NULL } from './arts/NullOrb.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -66,7 +67,7 @@ assets.buildDecor(scene);
 
 // Village homes on the four side/back pads (static scenery, facing the arena) and sakura trees on the slopes.
 const village = PADS.slice(2).map(p => [p.x, p.z, THREE.MathUtils.radToDeg(Math.atan2(-p.x, -p.z)), 1, terrainHeight(p.x, p.z)]);
-assets.scatter(scene, 'village', village, { fitHeight: 4 });
+assets.scatter(scene, 'village', village, { fitHeight: 4, eraseRadius: 5 });
 const env = new Environment({ scene, assets, grass }); // blossom trees, petals, props, mountains
 
 const puppets = [[-4, -5], [-1, -6.5], [2.5, -5.5], [5.5, -2.5]].map(([x, z], i) => new Puppet(physics, scene, x, z, i));
@@ -81,13 +82,14 @@ caster.env = env;
 const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
-const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); } });
+const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); red.reset(); nullOrb.reset(); } });
 let lastCast = '-';
 let nextArt = 0;
 const well = new GravityWell({ scene, physics, env, targets });            // Blue: pulls
 const red = new GravityWell({ scene, physics, env, targets, variant: RED_VARIANT }); // Red: repels
 well.other = red; red.other = well;
-const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red] });
+const nullOrb = new NullOrb({ scene, physics, env, targets, assets, grass, well, red }); // Purple: Blue + Red merged
+const mood = new WellMood({ scene, hemi, sun, sky, env, sanctum, sources: [well, red, nullOrb] });
 recognizer.onCast = (sigil, hand, which) => {
   lastCast = sigil.name;
   if (sigil.artId === 'sanctum') sanctum.activate(presetIdx, ruleIdx);
@@ -115,6 +117,9 @@ panel.addButton({ label: 'Well: Launch', x: 262, y: 610, w: 240, h: 70, onPress:
 
 panel.addButton({ label: 'Red: Charge', x: 10, y: 690, w: 240, h: 70, onPress: () => red.begin('left') });
 panel.addButton({ label: 'Red: Launch', x: 262, y: 690, w: 240, h: 70, onPress: () => red.launchNow() });
+
+panel.addButton({ label: 'Null: Merge', x: 10, y: 770, w: 240, h: 70, onPress: () => nullOrb.begin() });
+panel.addButton({ label: 'Null: Launch', x: 262, y: 770, w: 240, h: 70, onPress: () => nullOrb.launchNow() });
 
 // Forge: name / rebind the most recent custom Sigil.
 const ADJ = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron'];
@@ -145,7 +150,7 @@ function updateHud(dt, R) {
   panel.setLines([
     'SpellForge',
     rec,
-    `${lastCast} | Blue ${well.status} | Red ${red.status}`,
+    `${lastCast} | ${[['Blue', well], ['Red', red], ['Null', nullOrb]].filter(([, o]) => o.status !== 'ready').map(([n, o]) => `${n} ${o.status}`).join(' | ') || 'ready'}`,
     dbg ? `Best: ${dbg.sg.name} ${dbg.ratio.toFixed(2)} (<1 fires)` : 'Best: no hands',
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
     `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
@@ -175,11 +180,12 @@ renderer.setAnimationLoop(() => {
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
   if (recorder.active) recorder.update(dt, L, R, headInv); else {
     // A hand that is holding an orb is busy; the other hand can still sign (so you can hold Blue and Red together).
-    const busy = h => (well.active && well.which === h) || (red.active && red.which === h);
+    const busy = h => nullOrb.active || (well.active && well.which === h) || (red.active && red.which === h);
     recognizer.update(dt, busy('left') ? null : L, busy('right') ? null : R, headInv);
   }
   well.update(dt, headPos, headQ, L, R);
   red.update(dt, headPos, headQ, L, R);
+  nullOrb.update(dt, headPos, headQ, L, R);
   caster.update(dt, headPos);
   fx.update(dt);
   env.update(dt, clock.elapsedTime, headPos);
@@ -192,4 +198,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, mood, MOOD }; // debug/test hook
+window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, mood, MOOD }; // debug/test hook

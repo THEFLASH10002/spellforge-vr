@@ -143,6 +143,8 @@ const horizonMat = pal => new THREE.ShaderMaterial({
 export const PAL_BLUE = { coreA: 0x0f66ff, coreB: 0xb3ebff, aura1: 0x1f7fff, aura2: 0x4fc8ff, ribA: 0x26a6ff, ribB: 0xe6ffff, partA: 0x33bfff, partB: 0xffffff, spark: 0x99e6ff, halo: 0x2f8fff, out: false, voidC: 0x03060f, rimC: 0x1f5fe0, ringC: 0xe6f6ff, haloC: 0x3a9bff };
 export const PAL_RED = { coreA: 0xff1a0a, coreB: 0xffd2a0, aura1: 0xff2a14, aura2: 0xff8a3a, ribA: 0xff3a1a, ribB: 0xfff0d0, partA: 0xff3a22, partB: 0xffe0b0, spark: 0xffa060, halo: 0xff3a14, out: true, doppler: -0.55, voidC: 0x120204, rimC: 0xc02010, ringC: 0xfff0d8, haloC: 0xff5a1a };
 
+export const PAL_PURPLE = { coreA: 0x6a1cff, coreB: 0xe6c4ff, aura1: 0x7a2cff, aura2: 0xd05cff, ribA: 0x8a3cff, ribB: 0xfff0ff, partA: 0x9a4cff, partB: 0xffe6ff, spark: 0xd89cff, halo: 0x9a3cff, out: false, doppler: 0.3, voidC: 0x07000f, rimC: 0x7a2cd8, ringC: 0xffe8ff, haloC: 0xb050ff };
+
 export function createOrb(pal = PAL_BLUE) {
   const group = new THREE.Group();
   const mats = [];
