@@ -1,1 +1,1 @@
-export default { server: { host: true, port: 5173 }, build: { target: 'es2022' } };
+export default { base: './', server: { host: true, port: 5173 }, build: { target: 'es2022' } };

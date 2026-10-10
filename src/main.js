@@ -4,7 +4,7 @@ import { PhysicsWorld } from './physics/World.js';
 import { setupHands } from './xr/HandInput.js';
 import { extractHand } from './gestures/PoseFeatures.js';
 import { Recognizer } from './gestures/Recognizer.js';
-import { Recorder, loadCustom } from './gestures/Recorder.js';
+import { Recorder, loadCustom, saveCustom } from './gestures/Recorder.js';
 import { BUILTINS } from './gestures/builtins.js';
 import { ArtCaster } from './arts/ArtCaster.js';
 import { ART_IDS, ARTS } from './arts/ArtRegistry.js';
@@ -79,14 +79,31 @@ const panel = new Panel();
 panel.mesh.position.set(-0.55, 1.25, -0.7);
 panel.mesh.rotation.y = 0.6;
 scene.add(panel.mesh);
-[['Rec Right', 'right', 10, 330], ['Rec Left', 'left', 176, 330], ['Rec Two', 'two', 342, 330]].forEach(([label, mode, x, y]) =>
+[['Rec Right', 'right', 10, 370], ['Rec Left', 'left', 176, 370], ['Rec Two', 'two', 342, 370]].forEach(([label, mode, x, y]) =>
   panel.addButton({ label, x, y, w: 160, h: 70, onPress: () => !recorder.active && recorder.start(mode, ART_IDS[nextArt]) }));
-panel.addButton({ label: 'RESET', x: 10, y: 250, w: 118, h: 70, onPress: () => director.reset() });
-panel.addButton({ label: 'Sanctum', x: 136, y: 250, w: 118, h: 70, onPress: () => sanctum.activate(presetIdx, ruleIdx) });
-panel.addButton({ label: 'Look', x: 262, y: 250, w: 118, h: 70, onPress: () => { presetIdx = (presetIdx + 1) % PRESETS.length; } });
-panel.addButton({ label: 'Rule', x: 388, y: 250, w: 114, h: 70, onPress: () => { ruleIdx = (ruleIdx + 1) % RULES.length; } });
-panel.addButton({ label: 'Next Art', x: 10, y: 410, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % ART_IDS.length; } });
-panel.addButton({ label: 'Clear Custom', x: 262, y: 410, w: 240, h: 70, onPress: () => recorder.clearCustom() });
+panel.addButton({ label: 'RESET', x: 10, y: 290, w: 118, h: 70, onPress: () => director.reset() });
+panel.addButton({ label: 'Sanctum', x: 136, y: 290, w: 118, h: 70, onPress: () => sanctum.activate(presetIdx, ruleIdx) });
+panel.addButton({ label: 'Look', x: 262, y: 290, w: 118, h: 70, onPress: () => { presetIdx = (presetIdx + 1) % PRESETS.length; } });
+panel.addButton({ label: 'Rule', x: 388, y: 290, w: 114, h: 70, onPress: () => { ruleIdx = (ruleIdx + 1) % RULES.length; } });
+panel.addButton({ label: 'Next Art', x: 10, y: 450, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % ART_IDS.length; } });
+panel.addButton({ label: 'Clear Custom', x: 262, y: 450, w: 240, h: 70, onPress: () => recorder.clearCustom() });
+
+// Forge: name / rebind the most recent custom Sigil.
+const ADJ = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron'];
+const NOUN = ['Fang', 'Crown', 'Veil', 'Tide', 'Spiral', 'Lantern', 'Thorn', 'Echo', 'Comet', 'Gate'];
+let nameIdx = 0;
+const lastCustom = () => [...recognizer.sigils].reverse().find(s => !s.builtin);
+panel.addButton({ label: 'Rename Last', x: 10, y: 530, w: 240, h: 70, onPress: () => {
+  const s = lastCustom(); if (!s) return;
+  nameIdx++;
+  s.name = `${ADJ[nameIdx % ADJ.length]} ${NOUN[(nameIdx * 7 + 3) % NOUN.length]}`;
+  saveCustom(recognizer.sigils);
+} });
+panel.addButton({ label: 'Rebind Last', x: 262, y: 530, w: 240, h: 70, onPress: () => {
+  const s = lastCustom(); if (!s) return;
+  s.artId = ART_IDS[(ART_IDS.indexOf(s.artId) + 1) % ART_IDS.length];
+  saveCustom(recognizer.sigils);
+} });
 
 const headQ = new THREE.Quaternion();
 let hudT = 0;
@@ -105,6 +122,7 @@ function updateHud(dt, R) {
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
     `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
     `Sanctum: ${PRESETS[presetIdx].name} + ${RULES[ruleIdx].name}`,
+    (c => c ? `Last custom: ${c.name} -> ${ARTS[c.artId]?.name}` : 'Last custom: none')(lastCustom()),
   ]);
   panel.draw();
 }
