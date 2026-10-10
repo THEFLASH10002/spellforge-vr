@@ -12,7 +12,10 @@ import { glowTexture } from '../render/Toon.js';
 // the spellbook) are carried along through `onMove(delta)`.
 const MAX_REACH = 16;   // m: how far one teleport can go
 const WORLD_R = 40;     // m: how far from the arena centre you may go
-const PINCH_ON = 0.028, PINCH_OFF = 0.045; // m between thumb tip and index tip (hysteresis avoids flicker)
+const PINCH_ON = 0.018, PINCH_OFF = 0.03;  // m between thumb tip and index tip: they must really touch (hysteresis avoids flicker)
+const PINCH_HOLD = 0.2;                    // s the pinch must be held before the arc appears (a flick does nothing)
+const OPEN_MIN = 0.85;                     // the other three fingers must stay this straight (an 'OK' sign, not a fist or claw)
+const RAISED = 0.65;                       // m: the hand must be no lower than this below the head (not hanging at your side)
 const SPEED = 2.4;      // m/s thumbstick / keyboard walking
 
 export class Locomotion {
@@ -22,7 +25,7 @@ export class Locomotion {
     this.base = null;
     this.pinching = { left: false, right: false };
     this.aim = null; this.hold = 0; this.cool = 0; this.valid = false;
-    this.target = new THREE.Vector3(); this.keys = new Set();
+    this.target = new THREE.Vector3(); this.keys = new Set(); this.tmpR = new THREE.Vector3(); this.pinchT = 0;
     renderer.xr.addEventListener('sessionstart', () => { this.base = renderer.xr.getReferenceSpace(); this.apply(); });
     renderer.xr.addEventListener('sessionend', () => { this.base = null; });
     addEventListener('keydown', e => this.keys.add(e.code));
@@ -89,19 +92,25 @@ export class Locomotion {
     this.cool = 0.5;
   }
 
+  // RIGHT hand only. A teleport needs a deliberate "OK" pinch: thumb and index touching, the other three fingers open,
+  // the hand raised in front of you, held for a moment. Anything looser (a fist, a relaxed hand at your side) is ignored.
   update(dt, head, headQ, L, R, holding) {
     this.cool -= dt;
-    let aimed = false;
-    for (const side of ['left', 'right']) {
-      const h = side === 'left' ? L : R;
-      const fist = h && (h.curls[1] + h.curls[2] + h.curls[3] + h.curls[4]) / 4 < 0.72; // a fist is for grabbing / punching
-      if (!h || fist || holding(side) || this.cool > 0) { this.pinching[side] = false; continue; }
-      const d = h.thumb.distanceTo(h.tip), now = this.pinching[side] ? d < PINCH_OFF : d < PINCH_ON;
-      this.pinching[side] = now;
-      if (now && (!this.aim || this.aim === side)) { this.aim = side; this.hold += dt; this.showArc(h, head); aimed = true; }
+    this.pinching.left = false;
+    const h = R, f = this.fwd ||= new THREE.Vector3();
+    f.set(0, 0, -1).applyQuaternion(headQ);
+    let aimed = false, now = false;
+    if (h && !holding('right') && this.cool <= 0) {
+      const d = h.thumb.distanceTo(h.tip);
+      const open = (h.curls[2] + h.curls[3] + h.curls[4]) / 3 > OPEN_MIN;
+      const raised = h.wrist.y > head.y - RAISED && this.tmpR.copy(h.wrist).sub(head).dot(f) > 0.15; // up and in front of you
+      now = open && raised && (this.pinching.right ? d < PINCH_OFF : d < PINCH_ON);
     }
+    this.pinching.right = now;
+    this.pinchT = now ? (this.pinchT || 0) + dt : 0;
+    if (now && this.pinchT > PINCH_HOLD) { this.aim = 'right'; this.hold += dt; this.showArc(h, head); aimed = true; }
     if (!aimed && this.aim) { // pinch released
-      if (this.hold > 0.15) this.commit(head);
+      if (this.hold > 0.2) this.commit(head);
       this.aim = null; this.hold = 0; this.dots.visible = false; this.ring.visible = false;
     }
     if (!aimed) this.walk(dt, headQ);
