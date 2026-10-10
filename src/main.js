@@ -14,12 +14,15 @@ import { Puppet } from './enemies/Puppet.js';
 import { Director } from './demo/Director.js';
 import { Sanctum } from './sanctum/Sanctum.js';
 import { PRESETS, RULES } from './sanctum/presets.js';
+import { QUALITY, QUALITY_NAME } from './config/Quality.js';
+import { Perf } from './debug/Perf.js';
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(1);
+const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
+renderer.setPixelRatio(QUALITY.pixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
-renderer.xr.setFramebufferScaleFactor(0.9);
+renderer.xr.setFramebufferScaleFactor(QUALITY.xrScale);
+renderer.xr.setFoveation(QUALITY.foveation);
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer, {
   optionalFeatures: ['hand-tracking', 'local-floor'],
@@ -64,7 +67,8 @@ const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
 caster.destructibles = targets;
-const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets });
+const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, stars: QUALITY.stars });
+const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
 const director = new Director({ targets, caster, onReset: () => sanctum.reset() });
 let lastCast = '-';
@@ -122,6 +126,7 @@ function updateHud(dt, R) {
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
     `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
     `Sanctum: ${PRESETS[presetIdx].name} + ${RULES[ruleIdx].name}`,
+    `[${QUALITY_NAME}] ${perf.text}`,
     (c => c ? `Last custom: ${c.name} -> ${ARTS[c.artId]?.name}` : 'Last custom: none')(lastCustom()),
   ]);
   panel.draw();
@@ -136,6 +141,7 @@ addEventListener('resize', () => {
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = clock.getDelta();
+  perf.update(dt, renderer, physics);
   physics.step(dt * sanctum.timeScale);
   (renderer.xr.isPresenting ? renderer.xr.getCamera() : camera).getWorldQuaternion(headQ);
   const headInv = headQ.clone().invert();

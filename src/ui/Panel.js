@@ -23,8 +23,8 @@ export class Panel {
     const c = this.ctx, px = this.px, py = this.py;
     c.clearRect(0, 0, px, py);
     c.fillStyle = 'rgba(10,12,28,0.82)'; c.fillRect(0, 0, px, py);
-    c.fillStyle = '#e8ecff'; c.font = '24px sans-serif';
-    this.lines.forEach((t, i) => c.fillText(t, 14, 34 + i * 32));
+    c.fillStyle = '#e8ecff'; c.font = '20px sans-serif';
+    this.lines.forEach((t, i) => c.fillText(t, 14, 28 + i * 29));
     for (const b of this.buttons) {
       c.fillStyle = '#3b4cca'; c.fillRect(b.x, b.y, b.w, b.h);
       c.fillStyle = '#fff'; c.font = '22px sans-serif';

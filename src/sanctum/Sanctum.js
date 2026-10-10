@@ -8,7 +8,7 @@ const LANTERNS = [[-5.6, -2], [-5.6, -5], [-5.6, -8], [-5.6, -11], [5.8, -2], [5
 // Personal domain: tweens sky/fog/lights/floor, ignites lanterns, collapses remaining puppets,
 // then runs one gameplay rule (low gravity | slow time | pulse shockwaves) until reset.
 export class Sanctum {
-  constructor({ scene, physics, floor, hemi, sun, puppets }) {
+  constructor({ scene, physics, floor, hemi, sun, puppets, stars = 700 }) {
     Object.assign(this, { scene, physics, floor, hemi, sun, puppets });
     this.timeScale = 1; this.active = false; this.t = 0; this.timers = [];
     this.orig = {
@@ -25,7 +25,7 @@ export class Sanctum {
       scene.add(p, lamp);
       return lamp;
     });
-    const n = 700, pos = new Float32Array(n * 3);
+    const n = stars, pos = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       const v = new THREE.Vector3().randomDirection().multiplyScalar(18 + Math.random() * 22);
       pos.set([v.x, Math.abs(v.y) * 0.9 + 0.5, v.z], i * 3);
