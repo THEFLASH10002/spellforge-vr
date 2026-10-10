@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { PRESETS, RULES } from './presets.js';
 import { toon, glowTexture } from '../render/Toon.js';
 import { domeMaterial } from '../vfx/Effects.js';
+import { createVoidDome } from '../vfx/VoidDome.js';
+import { createAuroraVeil } from '../vfx/AuroraVeil.js';
 
 const LAMP_BASE = 0xffb868; // warm street-lantern glow before the Sanctum recolors it
 
@@ -59,6 +61,10 @@ export class Sanctum {
     this.stars.visible = false; scene.add(this.stars);
     this.ring = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 20), domeMaterial()); // shimmering barrier dome
     this.ring.frustumCulled = false; this.ring.visible = false; scene.add(this.ring);
+    // Star Void preset: a dome that closes from the horizon up to the zenith, plus aurora curtains (replace the noise dome + point stars).
+    this.voidDome = createVoidDome(); this.voidDome.mesh.scale.setScalar(42); scene.add(this.voidDome.mesh);
+    this.aurora = createAuroraVeil(); scene.add(this.aurora.mesh);
+    this.voidStyle = false;
   }
 
   activate(presetIdx = 0, ruleIdx = 0) {
@@ -69,7 +75,14 @@ export class Sanctum {
     this.pc = Object.fromEntries(['bg', 'fog', 'hemiSky', 'hemiGround', 'sun', 'lantern', 'stars', 'floor', 'skyTop', 'skyHorizon', 'skyGlow', 'moon'].map(k => [k, new THREE.Color(this.p[k])]));
     this.stars.material.color.copy(this.pc.stars);
     this.ring.material.uniforms.color.value.copy(this.pc.lantern);
-    this.stars.visible = this.ring.visible = true;
+    this.voidStyle = !!this.p.void;
+    this.stars.visible = this.ring.visible = !this.voidStyle;
+    this.voidDome.mesh.visible = this.aurora.mesh.visible = this.voidStyle;
+    if (this.voidStyle) {
+      const vd = this.voidDome.mat.uniforms, au = this.aurora.mat.uniforms;
+      vd.uTime.value = 0; vd.uFront.value = -0.3; vd.uEdge.value.copy(this.pc.lantern).lerp(new THREE.Color(0xc0a0ff), 0.5); vd.uStar.value.copy(this.pc.stars);
+      au.uFade.value = 0; au.uA.value.copy(this.pc.lantern);
+    }
     for (const { body } of this.physics.synced) body.wakeUp();
     this.env?.onSpell(new THREE.Vector3(0, 1.4, -1.5), 'sanctum'); // petals converge, then burst outward
     if (this.rule === 'lowgrav') this.physics.world.gravity = { x: 0, y: -2.2, z: 0 };
@@ -89,6 +102,7 @@ export class Sanctum {
     u.top.value.copy(o.skyTop); u.horizon.value.copy(o.skyHorizon); u.glow.value.copy(o.skyGlow);
     this.sky.moon.material.color.copy(o.moon);
     this.stars.visible = this.ring.visible = false;
+    this.voidDome.mesh.visible = this.aurora.mesh.visible = false; this.voidStyle = false;
     this.stars.material.opacity = 0;
   }
 
@@ -104,6 +118,11 @@ export class Sanctum {
     this.sun.color.copy(o.sun).lerp(pc.sun, k); this.sun.intensity = o.sunI + (p.sunI - o.sunI) * k;
     this.floor.material.color.copy(o.floor).lerp(pc.floor, k);
     this.stars.material.opacity = k * 0.9; this.stars.rotation.y += dt * 0.03;
+    if (this.voidStyle) { // the dome closes rim -> zenith, then the aurora curtains fade in under it
+      const vd = this.voidDome.mat.uniforms, au = this.aurora.mat.uniforms;
+      vd.uTime.value += dt; vd.uFront.value = -0.3 + 1.35 * smooth(clamp01((t - 0.2) / 2.0));
+      au.uTime.value += dt; au.uFade.value = smooth(clamp01((t - 1.8) / 1.6));
+    }
     const pr = clamp01(t / 1.6), du = this.ring.material.uniforms;
     this.ring.position.set(0, 1.2, -4);
     this.ring.scale.setScalar(2 + smooth(pr) * 32); // expands, then stays as a barrier

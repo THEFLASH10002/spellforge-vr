@@ -83,3 +83,7 @@ Built-in: Draco decoder (`public/draco/`, Apache-2.0, from three.js).
   simplified from `SingularityMaterial.js` in [majidmanzarpour/threejs-vfx](https://github.com/majidmanzarpour/threejs-vfx),
   MIT License, (c) mohamedachrefelouafi. The rest of that repository (its ability framework, bloom/distortion post pipeline, bundled HDR
   and character FBX, which carry their own licenses) is not used.
+- **Star Void Sanctum sky** (`src/vfx/VoidDome.js`, `src/vfx/AuroraVeil.js`): the dome that closes from the horizon to the zenith over a starfield is
+  inspired by the Nightfall ability, and the aurora curtains' separate alpha/brightness curves by the Aurora ability, both in
+  [majidmanzarpour/threejs-vfx](https://github.com/majidmanzarpour/threejs-vfx) (MIT, (c) mohamedachrefelouafi). That repo renders them as
+  ray-marched volumes, which is too costly for Quest 2, so these are original cheap shader rebuilds, not copied code.
