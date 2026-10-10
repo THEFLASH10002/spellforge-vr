@@ -98,8 +98,50 @@ const particleMat = pal => new THREE.ShaderMaterial({
     }`,
 });
 
-export const PAL_BLUE = { coreA: 0x0f66ff, coreB: 0xb3ebff, aura1: 0x1f7fff, aura2: 0x4fc8ff, ribA: 0x26a6ff, ribB: 0xe6ffff, partA: 0x33bfff, partB: 0xffffff, spark: 0x99e6ff, halo: 0x2f8fff, out: false };
-export const PAL_RED = { coreA: 0xff1a0a, coreB: 0xffd2a0, aura1: 0xff2a14, aura2: 0xff8a3a, ribA: 0xff3a1a, ribB: 0xfff0d0, partA: 0xff3a22, partB: 0xffe0b0, spark: 0xffa060, halo: 0xff3a14, out: true };
+// Event horizon: a camera-facing disc with a dark void, a photon ring offset outward from it, one side
+// brighter (relativistic-beaming look) and a soft halo. Technique adapted from SingularityMaterial.js in
+// github.com/majidmanzarpour/threejs-vfx (MIT, (c) mohamedachrefelouafi); simplified for Quest 2 (no scene-depth
+// soft fade, no simplex noise, one quad). The quad is built in the vertex shader from a world-space centre, so
+// it ignores the mesh matrix and always faces the camera.
+const horizonMat = pal => new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, depthTest: true, blending: THREE.NormalBlending, side: THREE.DoubleSide, fog: false,
+  uniforms: {
+    uTime: { value: 0 }, uCentre: { value: new THREE.Vector3() }, uSize: { value: 1 }, uRadius: { value: 0.3 }, uEdge: { value: 0.02 },
+    uRing: { value: 1.16 }, uRingWidth: { value: 0.03 }, uRingGlow: { value: 3.4 }, uDoppler: { value: 0.55 },
+    uHalo: { value: 0.22 }, uHaloGlow: { value: 1.3 }, uRim: { value: 0.5 }, uShimmer: { value: 0.12 }, uOpacity: { value: 1 },
+    uVoid: { value: new THREE.Color(pal.voidC) }, uRimC: { value: new THREE.Color(pal.rimC) },
+    uRingC: { value: new THREE.Color(pal.ringC) }, uHaloC: { value: new THREE.Color(pal.haloC) },
+  },
+  vertexShader: `uniform vec3 uCentre; uniform float uSize; varying vec2 vLocal;
+    void main(){
+      vec3 ax = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
+      vec3 ay = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+      vec2 ext = (uv - 0.5) * 2.0 * uSize; vLocal = ext;
+      gl_Position = projectionMatrix * viewMatrix * vec4(uCentre + ax * ext.x + ay * ext.y, 1.0);
+    }`,
+  fragmentShader: `uniform float uTime; uniform float uRadius; uniform float uEdge; uniform float uRing; uniform float uRingWidth;
+    uniform float uRingGlow; uniform float uDoppler; uniform float uHalo; uniform float uHaloGlow; uniform float uRim;
+    uniform float uShimmer; uniform float uOpacity; uniform vec3 uVoid; uniform vec3 uRimC; uniform vec3 uRingC; uniform vec3 uHaloC;
+    varying vec2 vLocal;
+    void main(){
+      float d = length(vLocal), rr = max(uRadius, 1e-3);
+      float wob = sin(vLocal.x * 9.0 / rr * 0.3 + uTime * 4.0) * sin(vLocal.y * 8.0 / rr * 0.3 - uTime * 3.1); // cheap stand-in for noise
+      float ringR = rr * uRing * (1.0 + uShimmer * wob);
+      float inside = 1.0 - smoothstep(rr - uEdge, rr + uEdge, d);
+      float ring = exp(-abs(d - ringR) / max(uRingWidth, 1e-3));
+      float halo = exp(-max(d - ringR, 0.0) / max(uHalo, 1e-3)) * (1.0 - inside);
+      float side = d > 1e-4 ? vLocal.x / d : 0.0;
+      ring *= clamp(1.0 + uDoppler * side, 0.0, 2.0);
+      vec3 col = uVoid * inside + uRimC * inside * smoothstep(rr * 0.3, rr, d) * uRim + uRingC * ring * uRingGlow + uHaloC * halo * uHaloGlow;
+      float a = clamp(max(inside, max(ring, halo * 0.8)), 0.0, 1.0) * uOpacity;
+      if (a < 0.003) discard;
+      gl_FragColor = vec4(col, a);
+      #include <colorspace_fragment>
+    }`,
+});
+
+export const PAL_BLUE = { coreA: 0x0f66ff, coreB: 0xb3ebff, aura1: 0x1f7fff, aura2: 0x4fc8ff, ribA: 0x26a6ff, ribB: 0xe6ffff, partA: 0x33bfff, partB: 0xffffff, spark: 0x99e6ff, halo: 0x2f8fff, out: false, voidC: 0x03060f, rimC: 0x1f5fe0, ringC: 0xe6f6ff, haloC: 0x3a9bff };
+export const PAL_RED = { coreA: 0xff1a0a, coreB: 0xffd2a0, aura1: 0xff2a14, aura2: 0xff8a3a, ribA: 0xff3a1a, ribB: 0xfff0d0, partA: 0xff3a22, partB: 0xffe0b0, spark: 0xffa060, halo: 0xff3a14, out: true, voidC: 0x120204, rimC: 0xc02010, ringC: 0xfff0d8, haloC: 0xff5a1a };
 
 export function createOrb(pal = PAL_BLUE) {
   const group = new THREE.Group();
@@ -125,6 +167,11 @@ export function createOrb(pal = PAL_BLUE) {
   const halo = makeHalo(pal.halo, 6);
   group.add(halo);
 
+  const hm = horizonMat(pal);
+  const horizon = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), hm);
+  horizon.frustumCulled = false; horizon.renderOrder = 10; horizon.visible = false;
+  group.add(horizon);
+
   const counts = FULL ? [150, 40, 40] : [90, 24, 24];
   const total = counts[0] + counts[1] + counts[2];
   const seed = new Float32Array(total * 4), kind = new Float32Array(total);
@@ -143,12 +190,20 @@ export function createOrb(pal = PAL_BLUE) {
 
   return {
     group, halo,
+    // Show the event horizon (meters; 0 hides it). Used for the Gravity Well's collapse phase.
+    setHorizon(radius, opacity = 1) {
+      horizon.visible = radius > 0.005;
+      hm.uniforms.uRadius.value = radius; hm.uniforms.uSize.value = radius * 3.4;
+      hm.uniforms.uEdge.value = radius * 0.06; hm.uniforms.uRingWidth.value = radius * 0.1; hm.uniforms.uHalo.value = radius * 0.7;
+      hm.uniforms.uOpacity.value = opacity;
+    },
     // radius: meters; charge: 0..1; dust: 0..1 (singularity ground dust); dustY: meters above ground.
     update(t, dt, charge, radius, dust = 0, dustY = 0) {
       const pulse = 1 + Math.sin(t * 13) * 0.05 * (0.4 + charge) + Math.sin(t * 31) * 0.02 * charge;
       group.scale.setScalar(Math.max(radius * pulse, 1e-3));
       for (const m of mats) { m.uniforms.uTime.value = t; m.uniforms.uCharge.value = charge; }
       pm.uniforms.uScale.value = Math.max(radius, 1e-3);
+      hm.uniforms.uTime.value = t; hm.uniforms.uCentre.value.copy(group.position);
       pm.uniforms.uDust.value = dust; pm.uniforms.uDustY.value = dustY;
       for (const r of rings) r.m.rotation.z += dt * r.spin * (1 + charge * 2.5);
       halo.material.opacity = 0.18 + 0.17 * charge + Math.sin(t * 17) * 0.03;

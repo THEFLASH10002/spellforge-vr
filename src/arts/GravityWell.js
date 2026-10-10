@@ -214,6 +214,7 @@ export class GravityWell {
     const collapse = k > 0.85 ? 1 - smooth((k - 0.85) / 0.15) : 1;
     const dustY = Math.max(0.1, this.pos.y - terrainHeight(this.pos.x, this.pos.z));
     this.orb.update(this.clock, dt, 1, grow * collapse, 1, dustY);
+    if (this.v.sign > 0) this.orb.setHorizon(grow * collapse * 1.9 * smooth(clamp01(this.sT / 0.35)), 1); // black void + photon ring
     this.status = `collapsing ${Math.max(0, this.singT - this.sT).toFixed(1)}s`;
     this.moodTarget = 1.0;
     if (this.sT >= this.singT) this.collapse(true);
@@ -230,13 +231,13 @@ export class GravityWell {
         if (d < 4) { const k = (1 - d / 4) * e.body.mass() * 2.5 / d; e.body.applyImpulse({ x: dx * k, y: dy * k + 0.5 * k * d, z: dz * k }, true); }
       }
     } else fx.burst(this.pos, this.v.light, 20, 2);
-    this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null; this.env.setWell(null, (0) * this.v.sign, this.v.id);
+    this.state = 'idle'; this.orb.group.visible = false; this.orb.setHorizon(0); this.trail?.dispose(); this.trail = null; this.env.setWell(null, (0) * this.v.sign, this.v.id);
     this.status = 'ready'; this.cool = Math.max(this.cool, 0.3);
     this.moodTarget = 0; // WellMood eases the light back slowly (~2.5 s) after the blue is gone
   }
 
   reset() {
-    this.state = 'idle'; this.orb.group.visible = false; this.trail?.dispose(); this.trail = null;
+    this.state = 'idle'; this.orb.group.visible = false; this.orb.setHorizon(0); this.trail?.dispose(); this.trail = null;
     this.cool = 0; this.env.setWell(null, (0) * this.v.sign, this.v.id); this.status = 'ready'; this.moodTarget = 0;
   }
 

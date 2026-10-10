@@ -77,3 +77,9 @@ Originals of optimized models are kept in the git-ignored `assets-src/` folder.
 Optimize command: `npx @gltf-transform/cli@4 optimize in.glb out.glb --texture-compress webp --texture-size 1024 --compress meshopt`
 
 Built-in: Draco decoder (`public/draco/`, Apache-2.0, from three.js).
+
+## Code / technique credits
+- **Event-horizon shader** (void + offset photon ring + one-sided brightness, used in the Gravity Well collapse): technique adapted and
+  simplified from `SingularityMaterial.js` in [majidmanzarpour/threejs-vfx](https://github.com/majidmanzarpour/threejs-vfx),
+  MIT License, (c) mohamedachrefelouafi. The rest of that repository (its ability framework, bloom/distortion post pipeline, bundled HDR
+  and character FBX, which carry their own licenses) is not used.

@@ -10,7 +10,7 @@ export const MOOD = {
   fadeTime: 2.4,    // s time-constant while fading after the orb is gone (slow)
   dimHemi: 0.68,    // ambient light removed at full mood
   dimSun: 0.85,     // key light removed at full mood
-  glow: 70,         // point-light intensity at full mood
+  glow: 38,         // point-light intensity at full mood (higher blows out the ground near the orb)
   glowRange: 11,    // m reach of the light
 };
 
