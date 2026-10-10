@@ -23,18 +23,19 @@ export class ArtCaster {
 
   push(hand, art) {
     const ring = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.14, 24), new THREE.MeshBasicMaterial({ color: art.color, side: THREE.DoubleSide, transparent: true }));
-    ring.position.copy(hand.wrist).addScaledVector(hand.fwd, 0.3);
-    ring.lookAt(ring.position.clone().add(hand.fwd));
+    const dir = hand.normal; // push where the palm faces
+    ring.position.copy(hand.wrist).addScaledVector(dir, 0.3);
+    ring.lookAt(ring.position.clone().add(dir));
     this.scene.add(ring);
     this.live.push({ mesh: ring, ttl: 0.4, fx: true });
     const to = new THREE.Vector3();
     for (const { mesh, body } of this.physics.synced) {
       to.copy(mesh.position).sub(hand.wrist);
       const dist = to.length();
-      if (dist > 8 || dist < 0.01 || to.normalize().dot(hand.fwd) < 0.8) continue;
+      if (dist > 8 || dist < 0.01 || to.normalize().dot(dir) < 0.8) continue;
       const k = 4 / Math.max(dist, 1);
       body.wakeUp();
-      body.applyImpulse({ x: hand.fwd.x * k, y: hand.fwd.y * k + 0.5 * k, z: hand.fwd.z * k }, true);
+      body.applyImpulse({ x: dir.x * k, y: dir.y * k + 0.5 * k, z: dir.z * k }, true);
     }
   }
 

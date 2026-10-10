@@ -18,8 +18,8 @@ export const BUILTINS = [
     w: handWeights({ curl: [0, 1, 1, 1, 1] }), // thumb ignored
   },
   {
-    id: 'repel-palm', name: 'Repel Palm', hand: 'any', artId: 'push', builtin: true, thresh: 0.12,
-    vec: tpl([E, E, E, E, E], [0, 0, -1]), // open hand, palm facing away from head
-    w: handWeights({ curl: [1, 1, 1, 1, 1], normal: 2 }),
+    id: 'repel-palm', name: 'Repel Palm', hand: 'any', artId: 'push', builtin: true, thresh: 0.2,
+    vec: tpl([0.92, E, E, E, E], [0, 0, -1]), // open hand, palm facing away from head
+    w: handWeights({ curl: [0.3, 1, 1, 1, 1], normal: 0.5 }), // thumb barely drops below 0.90, so low weight
   },
 ];

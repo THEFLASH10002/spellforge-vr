@@ -58,6 +58,7 @@ export function extractHand(hand, handedness, headInv) {
   return {
     vec, wrist, L, curls,
     fwd: f.clone(),
+    normal: n.clone(), // world-space palm-out direction
     tip: pos(J, 'index-finger-tip').clone(),
   };
 }
