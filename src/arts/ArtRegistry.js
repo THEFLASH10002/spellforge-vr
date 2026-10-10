@@ -4,5 +4,6 @@ export const ARTS = {
   push: { name: 'Repel', color: 0x4fd0ff },
   well: { name: 'Gravity Well', color: 0x4fb4ff },
   repulsor: { name: 'Repulsor', color: 0xff4a2a },
+  pull: { name: 'Pull', color: 0x8affc8 },
 };
 export const ART_IDS = Object.keys(ARTS);

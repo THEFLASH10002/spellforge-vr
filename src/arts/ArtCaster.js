@@ -14,7 +14,7 @@ export class ArtCaster {
     const art = ARTS[artId] || ARTS.bolt;
     fx.burst(hand.tip, art.color, 14, 1.5);
     this.env?.onSpell(artId === 'push' ? hand.wrist : hand.tip, artId === 'push' ? 'push' : 'cast');
-    if (artId === 'push') this.push(hand, art); else this.bolt(hand, art);
+    if (artId === 'push') this.push(hand, art); else if (artId === 'pull') this.pull(hand, art); else this.bolt(hand, art);
   }
 
   bolt(hand, art) {
@@ -47,12 +47,48 @@ export class ArtCaster {
     }
   }
 
+  // Pull (Grasp): a one-shot yank. Everything in a cone in front of the palm is dragged toward your hand: standing
+  // enemies are ragdolled and pulled in, structure pieces in reach shatter toward you, and loose debris flies at you.
+  pull(hand, art) {
+    const dir = hand.normal; // the palm faces the target
+    fx.shock(hand.wrist.clone().addScaledVector(dir, 1.1), dir, art.color, 3, 0.5, true); // collapsing wave
+    fx.burst(hand.wrist, art.color, 20, 2);
+    const to = new THREE.Vector3();
+    for (const d of this.destructibles) {
+      if (d.broken) continue;
+      to.copy(d.center || d.mesh.position).sub(hand.wrist);
+      const dist = to.length();
+      if (dist < 10 && to.normalize().dot(dir) > 0.8) d.shatter(hand.wrist, dir, 10, true); // pieces / ragdolls head for the hand
+    }
+    for (const { mesh, body, projectile } of this.physics.synced) { // includes the fragments / ragdoll parts just created
+      if (projectile) continue;
+      to.copy(mesh.position).sub(hand.wrist);
+      const dist = to.length();
+      if (dist > 12 || dist < 0.4 || to.normalize().dot(dir) < 0.75) continue;
+      const speed = Math.min(16, 5 + dist * 0.8); // mass-independent: heavy pieces fly too
+      body.wakeUp();
+      body.setLinvel({ x: -to.x * speed, y: -to.y * speed + 1.5, z: -to.z * speed }, true);
+    }
+    this.pulling = { t: 0, pos: hand.wrist.clone() }; // nearby petals stream toward the hand for a moment
+  }
+
   clear() {
     for (const e of this.live) { if (e.mesh) this.physics.remove(e.mesh); e.trail.dispose(); }
     this.live = [];
   }
 
   update(dt, cam) {
+    if (this.pulling) {
+      this.pulling.t += dt;
+      if (this.pulling.t < 0.8) {
+        this.env?.setWell(this.pulling.pos, 0.8, 'pull');
+        for (const { mesh, body, projectile } of this.physics.synced) { // catch: slow things that reach the hand instead of letting them fly past
+          if (projectile || mesh.position.distanceTo(this.pulling.pos) > 1.6) continue;
+          const v = body.linvel(); body.setLinvel({ x: v.x * 0.8, y: v.y * 0.8, z: v.z * 0.8 }, true);
+        }
+      }
+      else { this.env?.setWell(null, 0, 'pull'); this.pulling = null; }
+    }
     for (let i = this.live.length - 1; i >= 0; i--) {
       const e = this.live[i];
       if (e.mesh) {

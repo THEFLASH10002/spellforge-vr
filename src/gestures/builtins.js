@@ -49,5 +49,11 @@ export const BUILTINS = [
     vec: tpl([0, E, C, C, E]),
     w: handWeights({ curl: [0, 1, 1, 1, 1] }),
   },
+  {
+    // Grasp: every finger about half curled (a claw), palm facing forward. Yanks things toward you (the Pull Art).
+    id: 'grasp', name: 'Grasp', hand: 'any', artId: 'pull', builtin: true, thresh: 0.13,
+    vec: tpl([0.82, 0.78, 0.78, 0.78, 0.78], [0, 0, -1]),
+    w: handWeights({ curl: [0.3, 1, 1, 1, 1], normal: 0.5 }), // thumb low weight, palm must face away from you
+  },
   sanctumSigil(),
 ];
