@@ -8,7 +8,7 @@ import { terrainHeight } from '../world/Terrain.js';
 export const WELL = {
   chargeTime: 3,         // s to full charge
   maxMult: 2,            // charge multiplier at full charge
-  hover: 0.2,            // m above the palm
+  hover: 0.18,           // m above the fingertip (world up)
   smooth: 25,            // hand-follow smoothing (higher = tighter)
   minHold: 0.5,          // s before a throw can register (stops the activation motion launching it)
   throwMinSpeed: 1.8,    // m/s hand speed to count as a throw
@@ -72,7 +72,8 @@ export class GravityWell {
     const hand = this.which === 'left' ? L : R;
     if (hand) {
       this.lost = 0;
-      const target = this.tmp.copy(hand.wrist).addScaledVector(hand.fwd, 0.06).addScaledVector(hand.normal, WELL.hover);
+      // Above the fingertip in world-up (the palm normal points sideways in the pointer pose).
+      const target = this.tmp.copy(hand.tip).addScaledVector(UP, WELL.hover);
       if (this.first) { this.pos.copy(target); this.first = false; } else this.pos.lerp(target, 1 - Math.exp(-WELL.smooth * dt));
       this.hist.push({ t: this.clock, p: hand.wrist.clone() });
       while (this.hist.length > 2 && this.clock - this.hist[0].t > 0.35) this.hist.shift();
