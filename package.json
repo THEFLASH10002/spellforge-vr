@@ -1,0 +1,14 @@
+{
+  "name": "spellforge-vr",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview --host" },
+  "dependencies": {
+    "@dgreenheck/three-pinata": "2.0.1",
+    "@dimforge/rapier3d-compat": "0.14.0",
+    "three": "0.182.0",
+    "three.quarks": "0.17.1"
+  },
+  "devDependencies": { "vite": "8.3.4" }
+}
