@@ -76,15 +76,23 @@ export function toonify(root) {
   root.traverse(o => { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material); });
 }
 
-// Normal-extrusion outline for imported meshes (works best on smooth-shaded models). `t` is in local units.
+// Normal-extrusion outline for imported meshes (works best on smooth-shaded models).
+// `t` is the outline width in WORLD meters; it is converted per mesh using that mesh's world scale
+// (quantized/baked models carry large node scales, so a fixed local width would be wrong).
 export function outlineHull(root, t = 0.02) {
   if (!QUALITY.outline) return;
-  const mat = new THREE.ShaderMaterial({
+  root.updateMatrixWorld(true);
+  const base = new THREE.ShaderMaterial({
     uniforms: { thick: { value: t }, color: { value: new THREE.Color(0x0b0714) } }, side: THREE.BackSide,
     vertexShader: 'uniform float thick; void main(){ gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * thick, 1.0); }',
     fragmentShader: 'uniform vec3 color; void main(){ gl_FragColor = vec4(color, 1.0); }',
   });
-  const meshes = [];
+  const meshes = [], ws = new THREE.Vector3();
   root.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.userData.isOutline && o.geometry.attributes.normal) meshes.push(o); });
-  for (const m of meshes) { const h = new THREE.Mesh(m.geometry, mat); h.userData.isOutline = true; m.add(h); }
+  for (const m of meshes) {
+    m.getWorldScale(ws);
+    const mat = base.clone();
+    mat.uniforms.thick.value = t / Math.max((ws.x + ws.y + ws.z) / 3, 1e-6);
+    const h = new THREE.Mesh(m.geometry, mat); h.userData.isOutline = true; m.add(h);
+  }
 }

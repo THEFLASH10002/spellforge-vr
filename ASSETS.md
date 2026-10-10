@@ -68,6 +68,12 @@ Do NOT use assets ripped from games or anime (no franchise assets; see the origi
 
 | File | Source URL | Author | License |
 |---|---|---|---|
-| _none yet_ | | | |
+| `pagoda.glb` (optimized: 1024 px WebP, meshopt) | "Pagoda" on Poly Pizza | Poly by Google | CC-BY (attribution required; verify on the model page) |
+| `torii.glb` | "Torii Gate" on Poly Pizza | Quaternius | CC0 (verify on the model page) |
+| `lantern.glb` | "Hanging Lantern" on Poly Pizza | Kay Lousberg | CC0 (verify on the model page) |
+| `machiya.glb` (optimized: 1024 px WebP, meshopt) | "low_poly_japenese_house": **source and license unknown, fill in** | ? | ? |
+
+Originals of optimized models are kept in the git-ignored `assets-src/` folder.
+Optimize command: `npx @gltf-transform/cli@4 optimize in.glb out.glb --texture-compress webp --texture-size 1024 --compress meshopt`
 
 Built-in: Draco decoder (`public/draco/`, Apache-2.0, from three.js).

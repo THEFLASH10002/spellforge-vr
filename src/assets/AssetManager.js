@@ -47,9 +47,9 @@ export class AssetManager {
     root.updateMatrixWorld(true);
     box = new THREE.Box3().setFromObject(root);
     root.position.set(-(box.min.x + box.max.x) / 2, -box.min.y + (cfg.y || 0), -(box.min.z + box.max.z) / 2);
-    if (cfg.outline !== false) outlineHull(root, (cfg.outlineWidth ?? 0.02) / s);
     const wrap = new THREE.Group();
     wrap.add(root);
+    if (cfg.outline !== false) outlineHull(root, cfg.outlineWidth ?? 0.02);
     return wrap;
   }
 

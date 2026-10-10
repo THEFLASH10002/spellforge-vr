@@ -31,13 +31,21 @@ export function buildDistrict(physics, scene, assets) {
     }
   };
 
-  // Machiya rowhouses: plaster body + tiled roof.
-  [[-3.2, 0xe8e0d0], [-0.5, 0xd8cdb8]].forEach(([x, c]) => {
-    const body = piece(box(2.4, 2.2, 2), x, 1.1, -6, c, 16);
-    const roof = piece(box(2.9, 0.25, 2.5), x, 2.325, -6, 0x2f3440, 10);
+  // Machiya: with a GLB there is one wide house (proxy sized to its ~5 x 3.3 m footprint);
+  // otherwise two procedural rowhouses (plaster body + tiled roof).
+  const house = assets?.get('machiya', { fitHeight: 2.8 });
+  if (house) {
+    const body = piece(box(5, 2.4, 3.2), -1.85, 1.2, -6, 0xe8e0d0, 22);
+    const roof = piece(box(5.5, 0.4, 3.6), -1.85, 2.6, -6, 0x2f3440, 14);
     stack(body, roof);
-    skinned(assets?.get('machiya', { fitHeight: 2.45 }), x, -6, [body, roof]);
-  });
+    skinned(house, -1.85, -6, [body, roof]);
+  } else {
+    [[-3.2, 0xe8e0d0], [-0.5, 0xd8cdb8]].forEach(([x, c]) => {
+      const body = piece(box(2.4, 2.2, 2), x, 1.1, -6, c, 16);
+      const roof = piece(box(2.9, 0.25, 2.5), x, 2.325, -6, 0x2f3440, 10);
+      stack(body, roof);
+    });
+  }
 
   // Pagoda: three tiers with eaves.
   const px = 3.8, pz = -7;

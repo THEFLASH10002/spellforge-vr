@@ -34,8 +34,12 @@ export class Sanctum {
       halo.position.copy(lamp.position); halo.scale.setScalar(1.1);
       lamp.userData.halo = halo;
       scene.add(p, lamp, halo);
-      const skin = assets?.get('lantern', { fitHeight: 2.1 }); // GLB replaces pole + lamp; halo still recolors
-      if (skin) { skin.position.set(x, 0, z); scene.add(skin); p.visible = lamp.visible = false; }
+      // A hanging-lantern GLB replaces the lamp box and hangs from a taller pole; the halo still recolors.
+      const skin = assets?.get('lantern', { fitHeight: 0.6, outline: false });
+      if (skin) {
+        p.scale.y = 2.3 / 1.8; p.position.y = 1.15;
+        skin.position.set(x, 1.7, z); scene.add(skin); lamp.visible = false;
+      }
       return lamp;
     });
     const n = stars, pos = new Float32Array(n * 3);
