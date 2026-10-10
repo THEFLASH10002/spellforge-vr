@@ -13,8 +13,8 @@ const LANTERNS = Array.from({ length: 10 }, (_, i) => [Math.cos((i / 10) * Math.
 // Personal domain: tweens sky/fog/lights/floor, ignites lanterns, collapses remaining puppets,
 // then runs one gameplay rule (low gravity | slow time | pulse shockwaves) until reset.
 export class Sanctum {
-  constructor({ scene, physics, floor, hemi, sun, puppets, sky, assets, stars = 700 }) {
-    Object.assign(this, { scene, physics, floor, hemi, sun, puppets, sky });
+  constructor({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, stars = 700 }) {
+    Object.assign(this, { scene, physics, floor, hemi, sun, puppets, sky, env });
     this.timeScale = 1; this.active = false; this.t = 0; this.timers = [];
     this.orig = {
       bg: new THREE.Color(scene.background), fog: scene.fog.color.clone(), near: scene.fog.near, far: scene.fog.far,
@@ -71,6 +71,7 @@ export class Sanctum {
     this.ring.material.uniforms.color.value.copy(this.pc.lantern);
     this.stars.visible = this.ring.visible = true;
     for (const { body } of this.physics.synced) body.wakeUp();
+    this.env?.onSpell(new THREE.Vector3(0, 1.4, -1.5), 'sanctum'); // petals converge, then burst outward
     if (this.rule === 'lowgrav') this.physics.world.gravity = { x: 0, y: -2.2, z: 0 };
     if (this.rule === 'slowmo') this.timeScale = 0.35;
   }
@@ -83,6 +84,7 @@ export class Sanctum {
     this.hemi.color.copy(o.hemiSky); this.hemi.groundColor.copy(o.hemiGround); this.hemi.intensity = o.hemiI;
     this.sun.color.copy(o.sun); this.sun.intensity = o.sunI; this.floor.material.color.copy(o.floor);
     for (const l of this.lamps) { l.material.color.set(LAMP_BASE); l.userData.halo.material.color.set(LAMP_BASE); }
+    this.env?.reset();
     const u = this.sky.u;
     u.top.value.copy(o.skyTop); u.horizon.value.copy(o.skyHorizon); u.glow.value.copy(o.skyGlow);
     this.sky.moon.material.color.copy(o.moon);
@@ -106,6 +108,7 @@ export class Sanctum {
     this.ring.position.set(0, 1.2, -4);
     this.ring.scale.setScalar(2 + smooth(pr) * 32); // expands, then stays as a barrier
     du.time.value += dt; du.intensity.value = 0.35 + (1 - pr);
+    this.env?.tint(pc, k); // blossoms, petals, grass, mountains follow the Sanctum color; wind intensifies
     const u = this.sky.u;
     u.top.value.copy(o.skyTop).lerp(pc.skyTop, k); u.horizon.value.copy(o.skyHorizon).lerp(pc.skyHorizon, k);
     u.glow.value.copy(o.skyGlow).lerp(pc.skyGlow, k); this.sky.moon.material.color.copy(o.moon).lerp(pc.moon, k);

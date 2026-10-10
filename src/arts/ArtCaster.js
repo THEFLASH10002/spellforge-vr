@@ -13,6 +13,7 @@ export class ArtCaster {
     if (!hand) return;
     const art = ARTS[artId] || ARTS.bolt;
     fx.burst(hand.tip, art.color, 14, 1.5);
+    this.env?.onSpell(artId === 'push' ? hand.wrist : hand.tip, artId === 'push' ? 'push' : 'cast');
     if (artId === 'push') this.push(hand, art); else this.bolt(hand, art);
   }
 

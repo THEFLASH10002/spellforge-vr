@@ -22,6 +22,7 @@ import { fx } from './vfx/Effects.js';
 import { AssetManager } from './assets/AssetManager.js';
 import { buildTerrain, buildTrainingGround, terrainHeight, onPath, PADS, FLAT } from './world/Terrain.js';
 import { Grass } from './world/Grass.js';
+import { Environment } from './world/Environment.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -36,13 +37,13 @@ document.body.appendChild(VRButton.createButton(renderer, {
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0d1a);
-scene.fog = new THREE.Fog(0x3a2d5c, 12, 60); // matches the sky horizon
+scene.fog = new THREE.Fog(0xd9998f, 22, 95); // rose haze matching the sunset horizon
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.05, 200);
 camera.position.set(0, 1.6, 0);
-const hemi = new THREE.HemisphereLight(0xa8b0ff, 0x3a2f4a, 1.5);
+const hemi = new THREE.HemisphereLight(0xffc8a8, 0x5a4670, 1.35); // soft warm sky fill, plum bounce
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xc4d0ff, 1.5); // cool moonlight key from behind-left so facades stay readable
-sun.position.set(-3, 6, 4);
+const sun = new THREE.DirectionalLight(0xffb27a, 1.6); // warm key from behind-left so facades facing us stay lit
+sun.position.set(-6, 10, 8);
 scene.add(sun);
 const sky = new Sky(scene);
 fx.init(scene);
@@ -64,15 +65,7 @@ assets.buildDecor(scene);
 // Village homes on the four side/back pads (static scenery, facing the arena) and sakura trees on the slopes.
 const village = PADS.slice(2).map(p => [p.x, p.z, THREE.MathUtils.radToDeg(Math.atan2(-p.x, -p.z)), 1, terrainHeight(p.x, p.z)]);
 assets.scatter(scene, 'village', village, { fitHeight: 4 });
-let seed = 7;
-const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-const trees = [];
-while (trees.length < QUALITY.trees) {
-  const x = (rand() - 0.5) * 90, z = (rand() - 0.5) * 90, r = Math.hypot(x, z);
-  if (r < FLAT + 2 || r > 44 || onPath(x, z) || PADS.some(p => Math.hypot(x - p.x, z - p.z) < p.r + 3)) continue;
-  trees.push([x, z, rand() * 360, 0.8 + rand() * 0.5, terrainHeight(x, z)]);
-}
-assets.scatter(scene, 'tree', trees, { fitHeight: 6 });
+const env = new Environment({ scene, assets, grass }); // blossom trees, petals, props, mountains
 
 const puppets = [[-4, -5], [-1, -6.5], [2.5, -5.5], [5.5, -2.5]].map(([x, z], i) => new Puppet(physics, scene, x, z, i));
 
@@ -82,7 +75,8 @@ const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
 const targets = [...district.pieces, ...puppets];
 caster.destructibles = targets;
-const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, stars: QUALITY.stars });
+caster.env = env;
+const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
 const director = new Director({ targets, caster, onReset: () => sanctum.reset() });
@@ -167,7 +161,7 @@ renderer.setAnimationLoop(() => {
   if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
   caster.update(dt, headPos);
   fx.update(dt);
-  grass.update(clock.elapsedTime);
+  env.update(dt, clock.elapsedTime, headPos);
   district.update(dt * sanctum.timeScale);
   sanctum.update(dt);
   for (const p of puppets) p.update(dt, clock.elapsedTime);
@@ -175,3 +169,5 @@ renderer.setAnimationLoop(() => {
   updateHud(dt, R);
   renderer.render(scene, camera);
 });
+
+window.spellforge = { sanctum, env, caster, director, renderer, scene }; // debug/test hook

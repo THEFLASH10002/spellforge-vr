@@ -4,9 +4,9 @@ import * as THREE from 'three';
 export class Sky {
   constructor(scene) {
     this.u = {
-      top: { value: new THREE.Color(0x0b1030) },
-      horizon: { value: new THREE.Color(0x4a3066) },
-      glow: { value: new THREE.Color(0xff9a6a) },
+      top: { value: new THREE.Color(0x2c2c70) },      // sunset: indigo overhead
+      horizon: { value: new THREE.Color(0xff9a7a) },  // pink-orange haze
+      glow: { value: new THREE.Color(0xffd0a0) },
     };
     const mat = new THREE.ShaderMaterial({
       uniforms: this.u, side: THREE.BackSide, depthWrite: false, fog: false,
@@ -31,13 +31,11 @@ export class Sky {
     halo.addColorStop(0, 'rgba(255,255,255,0.45)'); halo.addColorStop(1, 'rgba(255,255,255,0)');
     g.fillStyle = halo; g.fillRect(0, 0, 128, 128);
     g.fillStyle = '#fff'; g.beginPath(); g.arc(64, 64, 20, 0, Math.PI * 2); g.fill();
-    g.fillStyle = 'rgba(190,200,230,0.55)';
-    [[58, 58, 5], [70, 68, 4], [62, 72, 3]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); });
-    this.moon = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: new THREE.CanvasTexture(c), color: 0xf2ecd2, fog: false, depthWrite: false, transparent: true,
+    this.moon = new THREE.Sprite(new THREE.SpriteMaterial({ // the low setting sun (kept under the name "moon" for the Sanctum tween)
+      map: new THREE.CanvasTexture(c), color: 0xffd09a, fog: false, depthWrite: false, transparent: true,
     }));
-    this.moon.position.set(-28, 30, -55);
-    this.moon.scale.setScalar(20);
+    this.moon.position.set(-22, 9, -62);
+    this.moon.scale.setScalar(28);
     this.moon.renderOrder = -1;
     scene.add(this.moon);
   }

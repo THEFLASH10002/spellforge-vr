@@ -22,7 +22,7 @@ export class Grass {
     geo.instanceCount = count;
 
     this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uTime: { value: 0 }, uTint: { value: new THREE.Color(0.62, 0.7, 0.85) },
+      uTime: { value: 0 }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
       uBase: { value: new THREE.Color(0x2f5e1e) }, uTip: { value: new THREE.Color(0x9ad258) },
     }]);
     const mat = new THREE.ShaderMaterial({

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { toonify, outlineHull } from '../render/Toon.js';
+import { toonify, outlineHull, applyGlow, makeSway } from '../render/Toon.js';
 
 const url = p => new URL(p, document.baseURI).href;
 
@@ -13,6 +13,8 @@ const url = p => new URL(p, document.baseURI).href;
 export class AssetManager {
   static async load() {
     const am = new AssetManager();
+    am.swayTime = { value: 0 };  // shared wind clock for swaying instanced slots ("sway": true)
+    am.glowMats = [];            // blossom materials (slot option "glow") so the Sanctum can recolor them
     am.manifest = { slots: {}, decor: [] };
     try {
       const r = await fetch(url('assets/manifest.json'), { cache: 'no-cache' });
@@ -39,6 +41,7 @@ export class AssetManager {
   prep(source, cfg) {
     const root = source.clone(true);
     if (cfg.toon !== false) toonify(root);
+    if (cfg.glow) this.glowMats.push(...applyGlow(root, cfg.glow));
     root.rotation.y = THREE.MathUtils.degToRad(cfg.rotY || 0);
     root.updateMatrixWorld(true);
     let box = new THREE.Box3().setFromObject(root);
@@ -70,6 +73,8 @@ export class AssetManager {
     if (n) console.log(`[assets] decor: ${n} instanced mesh(es)`);
   }
 
+  update(t) { this.swayTime.value = t; }
+
   // Instance a manifest slot at code-computed points [x, z, rotDeg, scale, y]; no-op if the slot has no GLB.
   scatter(scene, name, points, defaults = {}) {
     const raw = this.raw[name];
@@ -85,13 +90,23 @@ export class AssetManager {
     let n = 0;
     wrap.traverse(o => {
       if (!o.isMesh) return;
-      const im = new THREE.InstancedMesh(o.geometry, o.material, points.length);
-      const m = new THREE.Matrix4(), place = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+      let geo = o.geometry;
+      if (cfg.sway) { // per-instance (groundY, height) drives the wind sway shader
+        geo = geo.clone();
+        const ab = new Float32Array(points.length * 2);
+        points.forEach(([, , , s = 1, y = 0], k) => { ab[k * 2] = y; ab[k * 2 + 1] = Math.max(0.5, (cfg.fitHeight || 5) * s); });
+        geo.setAttribute('aBase', new THREE.InstancedBufferAttribute(ab, 2));
+        for (const mat of [].concat(o.material)) makeSway(mat, this.swayTime, cfg.swayAmount ?? 0.3);
+      }
+      const im = new THREE.InstancedMesh(geo, o.material, points.length);
+      const m = new THREE.Matrix4(), place = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), tint = new THREE.Color();
       points.forEach(([x, z, rot, s = 1, y = 0], k) => {
         q.setFromAxisAngle(up, THREE.MathUtils.degToRad(rot || 0));
         place.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(s, s, s));
         im.setMatrixAt(k, m.multiplyMatrices(place, o.matrixWorld));
+        if (cfg.vary) im.setColorAt(k, tint.setRGB(0.85 + Math.random() * 0.15, 0.82 + Math.random() * 0.18, 0.86 + Math.random() * 0.14)); // subtle per-instance tint
       });
+      if (im.instanceColor) im.instanceColor.needsUpdate = true;
       im.frustumCulled = false;
       scene.add(im); n++;
     });
