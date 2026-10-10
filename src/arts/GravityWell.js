@@ -94,7 +94,7 @@ export class GravityWell {
     const hand = this.which === 'left' ? L : R;
     if (hand) {
       this.lost = 0;
-      // Above the fingertip in world-up (the palm normal points sideways in the pointer pose).
+      // Above the fingertip in world-up (the palm normal points sideways when fingers are raised).
       const target = this.tmp.copy(hand.tip).addScaledVector(UP, this.cfg.hover);
       if (this.first) { this.pos.copy(target); this.first = false; } else this.pos.lerp(target, 1 - Math.exp(-this.cfg.smooth * dt));
       this.hist.push({ t: this.clock, p: hand.wrist.clone() });

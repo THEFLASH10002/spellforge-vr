@@ -27,8 +27,9 @@ function sanctumSigil() {
 // Built-in Sigils are rule-style: only curl (and optionally palm direction) are compared.
 export const BUILTINS = [
   {
-    id: 'twin-fang', name: 'Twin Fang', hand: 'any', artId: 'bolt', builtin: true, thresh: 0.12,
-    vec: tpl([0, E, E, C, C]),
+    // Fang: index finger out, middle/ring/pinky curled (thumb ignored). Fires the Bolt.
+    id: 'twin-fang', name: 'Fang', hand: 'any', artId: 'bolt', builtin: true, thresh: 0.12,
+    vec: tpl([0, E, C, C, C]),
     w: handWeights({ curl: [0, 1, 1, 1, 1] }), // thumb ignored
   },
   {
@@ -37,9 +38,9 @@ export const BUILTINS = [
     w: handWeights({ curl: [0.3, 1, 1, 1, 1], normal: 0.5 }), // thumb barely drops below 0.90, so low weight
   },
   {
-    // Pointer: index finger out, middle/ring/pinky curled (thumb ignored). Starts charging the Gravity Well.
+    // Two fingers: index + middle up, ring/pinky curled (thumb ignored). Starts charging the Gravity Well (Blue).
     id: 'gravity-well', name: 'Gravity Well', hand: 'any', artId: 'well', builtin: true, thresh: 0.12,
-    vec: tpl([0, E, C, C, C]),
+    vec: tpl([0, E, E, C, C]),
     w: handWeights({ curl: [0, 1, 1, 1, 1] }),
   },
   {
