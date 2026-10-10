@@ -22,12 +22,12 @@ export class Grass {
     geo.instanceCount = count;
 
     this.uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
-      uTime: { value: 0 }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
+      uTime: { value: 0 }, uWell: { value: new THREE.Vector4() }, uTint: { value: new THREE.Color(1.0, 0.92, 0.8) }, // warm sunset light
       uBase: { value: new THREE.Color(0x2f5e1e) }, uTip: { value: new THREE.Color(0x9ad258) },
     }]);
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms, side: THREE.DoubleSide, fog: true,
-      vertexShader: `attribute vec3 aOffset; attribute vec2 aRand; attribute float aTip; uniform float uTime;
+      vertexShader: `attribute vec3 aOffset; attribute vec2 aRand; attribute float aTip; uniform float uTime; uniform vec4 uWell;
         varying float vTip; varying float vShade;
         #include <fog_pars_vertex>
         void main(){
@@ -35,6 +35,10 @@ export class Grass {
           vec3 p = position; p.y *= aRand.y * 0.9 + 0.2; float h = p.y;
           float w = sin(uTime * 1.7 + aOffset.x * 0.35 + aOffset.z * 0.27) * 0.2 * aTip * aTip * h;
           vec3 world = aOffset + vec3(p.x * c + w, p.y, -p.x * s + w * 0.5);
+          vec2 dw = uWell.xz - aOffset.xz; // Gravity Well: blades lean toward the singularity
+          float wf = uWell.w * smoothstep(8.0, 0.0, length(dw));
+          world.xz += normalize(dw + vec2(0.0001)) * wf * 0.7 * aTip * aTip * h;
+          world.y -= wf * 0.3 * aTip * h;
           vTip = aTip; vShade = 0.75 + aRand.x * 0.5;
           vec4 mvPosition = modelViewMatrix * vec4(world, 1.0);
           gl_Position = projectionMatrix * mvPosition;

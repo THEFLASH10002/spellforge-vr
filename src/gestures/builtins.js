@@ -36,5 +36,11 @@ export const BUILTINS = [
     vec: tpl([0.92, E, E, E, E], [0, 0, -1]), // open hand, palm facing away from head
     w: handWeights({ curl: [0.3, 1, 1, 1, 1], normal: 0.5 }), // thumb barely drops below 0.90, so low weight
   },
+  {
+    // Pointer: index finger out, middle/ring/pinky curled (thumb ignored). Starts charging the Gravity Well.
+    id: 'gravity-well', name: 'Gravity Well', hand: 'any', artId: 'well', builtin: true, thresh: 0.12,
+    vec: tpl([0, E, C, C, C]),
+    w: handWeights({ curl: [0, 1, 1, 1, 1] }),
+  },
   sanctumSigil(),
 ];

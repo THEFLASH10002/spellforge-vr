@@ -49,8 +49,15 @@ export class PhysicsWorld {
     body.setGravityScale(0.15, true); // bolts fly nearly straight so they reach the hillside town
     const c = this.world.createCollider(this.R.ColliderDesc.ball(r).setRestitution(0.3).setDensity(4), body);
     if (tag) this.tag(c, tag);
-    this.synced.push({ mesh, body });
+    this.synced.push({ mesh, body, projectile: true });
     return body;
+  }
+  // Keep the number of active debris bodies bounded (oldest fragments are dropped first).
+  trimDebris(max = 200) {
+    let over = this.synced.length - max;
+    for (let i = 0; i < this.synced.length && over > 0;) {
+      if (this.synced[i].debris) { this.remove(this.synced[i].mesh); over--; } else i++;
+    }
   }
   remove(mesh) {
     const i = this.synced.findIndex(e => e.mesh === mesh);

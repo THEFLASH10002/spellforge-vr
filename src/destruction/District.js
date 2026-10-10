@@ -25,10 +25,10 @@ export function buildDistrict(physics, scene, assets) {
     let done = false;
     for (const p of pieces) {
       p.mesh.visible = false;
-      p.onShatter = (pt, dir, speed) => {
+      p.onShatter = (pt, dir, speed, pull) => {
         if (done) return;
         done = true; skin.visible = false;
-        pieces.forEach((q, i) => { if (q !== p) q.pending.push({ t: 0.05 + i * 0.06, fn: () => q.shatter(pt, dir, speed * 0.6) }); });
+        pieces.forEach((q, i) => { if (q !== p) q.pending.push({ t: 0.05 + i * 0.06, fn: () => q.shatter(pt, dir, speed * 0.6, pull) }); });
       };
       p.onReset = () => { done = false; skin.visible = true; };
     }

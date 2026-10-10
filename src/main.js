@@ -23,6 +23,7 @@ import { AssetManager } from './assets/AssetManager.js';
 import { buildTerrain, buildTrainingGround, terrainHeight, onPath, PADS, FLAT } from './world/Terrain.js';
 import { Grass } from './world/Grass.js';
 import { Environment } from './world/Environment.js';
+import { GravityWell, WELL } from './arts/GravityWell.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: QUALITY.aa, powerPreference: 'high-performance' });
 renderer.setPixelRatio(QUALITY.pixelRatio);
@@ -79,17 +80,19 @@ caster.env = env;
 const sanctum = new Sanctum({ scene, physics, floor, hemi, sun, puppets, sky, assets, env, stars: QUALITY.stars });
 const perf = new Perf();
 let presetIdx = 0, ruleIdx = 0;
-const director = new Director({ targets, caster, onReset: () => sanctum.reset() });
+const director = new Director({ targets, caster, onReset: () => { sanctum.reset(); well.reset(); } });
 let lastCast = '-';
 let nextArt = 0;
-recognizer.onCast = (sigil, hand) => {
+const well = new GravityWell({ scene, physics, env, targets });
+recognizer.onCast = (sigil, hand, which) => {
   lastCast = `${sigil.name} (${sigil.artId})`;
   if (sigil.artId === 'sanctum') sanctum.activate(presetIdx, ruleIdx);
+  else if (sigil.artId === 'well') well.begin(which); // hold + charge + throw (see GravityWell.js)
   else caster.cast(sigil.artId, hand);
 };
 
 const panel = new Panel();
-panel.mesh.position.set(-0.55, 1.25, -0.7);
+panel.mesh.position.set(-0.55, 1.2, -0.7);
 panel.mesh.rotation.y = 0.6;
 scene.add(panel.mesh);
 [['Rec Right', 'right', 10, 370], ['Rec Left', 'left', 176, 370], ['Rec Two', 'two', 342, 370]].forEach(([label, mode, x, y]) =>
@@ -100,6 +103,10 @@ panel.addButton({ label: 'Look', x: 262, y: 290, w: 118, h: 70, onPress: () => {
 panel.addButton({ label: 'Rule', x: 388, y: 290, w: 114, h: 70, onPress: () => { ruleIdx = (ruleIdx + 1) % RULES.length; } });
 panel.addButton({ label: 'Next Art', x: 10, y: 450, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % ART_IDS.length; } });
 panel.addButton({ label: 'Clear Custom', x: 262, y: 450, w: 240, h: 70, onPress: () => recorder.clearCustom() });
+
+// Gravity Well fallbacks: start charging without the hand sign, and launch without a throw.
+panel.addButton({ label: 'Well: Charge', x: 10, y: 610, w: 240, h: 70, onPress: () => well.begin('right') });
+panel.addButton({ label: 'Well: Launch', x: 262, y: 610, w: 240, h: 70, onPress: () => well.launchNow() });
 
 // Forge: name / rebind the most recent custom Sigil.
 const ADJ = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron'];
@@ -130,7 +137,7 @@ function updateHud(dt, R) {
   panel.setLines([
     'SpellForge',
     rec,
-    `Cast: ${lastCast}`,
+    `Cast: ${lastCast} | Well: ${well.status}`,
     dbg ? `Best: ${dbg.sg.name} ${dbg.ratio.toFixed(2)} (<1 fires)` : 'Best: no hands',
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
     `Next record art: ${ARTS[ART_IDS[nextArt]].name} | Sigils: ${recognizer.sigils.length}`,
@@ -158,7 +165,8 @@ renderer.setAnimationLoop(() => {
   const headInv = headQ.clone().invert();
   const lh = handBy('left'), rh = handBy('right');
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
-  if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
+  if (recorder.active) recorder.update(dt, L, R, headInv); else if (!well.active) recognizer.update(dt, L, R, headInv);
+  well.update(dt, headPos, headQ, L, R);
   caster.update(dt, headPos);
   fx.update(dt);
   env.update(dt, clock.elapsedTime, headPos);
@@ -170,4 +178,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { sanctum, env, caster, director, renderer, scene }; // debug/test hook
+window.spellforge = { sanctum, env, caster, director, renderer, scene, well, WELL }; // debug/test hook

@@ -9,7 +9,7 @@ const R = 28; // wrap half-size (m) around the origin
 const vert = `
 attribute vec4 aSeed; attribute vec3 aSpawn;
 uniform float uTime; uniform vec2 uWind; uniform float uSize; uniform vec3 uHead;
-uniform vec4 uAttract; uniform vec4 uBurst;
+uniform vec4 uAttract; uniform vec4 uBurst; uniform vec4 uWell;
 uniform vec3 uColA; uniform vec3 uColB; uniform vec3 uTint; uniform float uTintK;
 varying vec3 vCol; varying float vA; varying vec2 vQ;
 void main(){
@@ -26,6 +26,11 @@ void main(){
 
   vec3 toH = uAttract.xyz - c; float dH = length(toH);
   c += toH * uAttract.w * smoothstep(7.0, 0.5, dH) * 0.9;
+  // Gravity Well: petals within ~9 m spiral into the singularity.
+  vec3 toW = uWell.xyz - c; float dW = length(toW) + 0.001;
+  float fw = uWell.w * smoothstep(9.0, 0.3, dW);
+  vec3 tang = normalize(cross(vec3(0.0, 1.0, 0.0), toW) + vec3(0.0001));
+  c += toW * fw * 0.93 + tang * fw * min(dW, 2.5) * 0.7;
   vec3 fromB = c - uBurst.xyz; float dB = length(fromB) + 0.001;
   c += (fromB / dB * 4.5 + vec3(0.0, 1.2, 0.0)) * uBurst.w * smoothstep(9.0, 0.5, dB);
 
@@ -72,7 +77,7 @@ export class Petals {
 
     this.u = {
       uTime: { value: 0 }, uWind: { value: new THREE.Vector2() }, uSize: { value: 0.13 }, uHead: { value: new THREE.Vector3() },
-      uAttract: { value: new THREE.Vector4() }, uBurst: { value: new THREE.Vector4() },
+      uAttract: { value: new THREE.Vector4() }, uBurst: { value: new THREE.Vector4() }, uWell: { value: new THREE.Vector4() },
       uColA: { value: new THREE.Color(0xffc2d6) }, uColB: { value: new THREE.Color(0xff86b4) },
       uTint: { value: new THREE.Color(0xffffff) }, uTintK: { value: 0 },
     };

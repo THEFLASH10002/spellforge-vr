@@ -134,18 +134,18 @@ export const fx = {
   sparks: null, shocks: [], scene: null,
   init(scene) { this.scene = scene; this.sparks = new Sparks(scene, FULL ? 400 : 200); },
   burst(p, color, count = 24, speed = 3) { this.sparks?.emit(p, color, count, speed); },
-  shock(pos, dir, color) {
+  shock(pos, dir, color, size = 5) {
     const mesh = new THREE.Mesh(domeGeo, shockMaterial(color));
     mesh.position.copy(pos);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
     this.scene.add(mesh);
-    this.shocks.push({ mesh, t: 0 });
+    this.shocks.push({ mesh, t: 0, size });
   },
   update(dt) {
     this.sparks?.update(dt);
     for (let i = this.shocks.length - 1; i >= 0; i--) {
       const s = this.shocks[i], p = (s.t += dt) / 0.55;
-      s.mesh.scale.setScalar(0.3 + Math.min(p, 1) * 5);
+      s.mesh.scale.setScalar(0.3 + Math.min(p, 1) * s.size);
       s.mesh.material.uniforms.progress.value = Math.min(p, 1);
       if (p >= 1) { s.mesh.removeFromParent(); s.mesh.material.dispose(); this.shocks.splice(i, 1); }
     }

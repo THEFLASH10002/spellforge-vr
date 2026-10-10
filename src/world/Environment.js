@@ -26,6 +26,7 @@ export class Environment {
   constructor({ scene, assets, grass }) {
     this.scene = scene; this.assets = assets; this.grass = grass;
     this.grassBase = grass.uniforms.uTint.value.clone();
+    this.wellPos = new THREE.Vector3(); this.wellK = 0; this.wellT = 0;
 
     // --- Cherry blossoms: GLB trees (glow + sway + variation come from the manifest), halos, petals ---
     const trees = treeSites().slice(0, QUALITY.trees);
@@ -116,7 +117,17 @@ export class Environment {
     this.scene.add(im);
   }
 
-  update(dt, t, head) { this.assets.update(t); this.petals.update(dt, t, head); this.grass.update(t); }
+  update(dt, t, head) {
+    this.assets.update(t); this.petals.update(dt, t, head); this.grass.update(t);
+    // Gravity Well: eased strength so petals/grass glide toward the singularity.
+    this.wellK += (this.wellT - this.wellK) * Math.min(1, dt * 3);
+    const p = this.wellPos, w = this.wellK;
+    this.petals.u.uWell.value.set(p.x, p.y, p.z, w);
+    this.grass.uniforms.uWell.value.set(p.x, p.y, p.z, w);
+  }
+
+  // Attract petals + grass toward `pos` with strength k (0..1). Pass (null, 0) to release.
+  setWell(pos, k) { if (pos) this.wellPos.copy(pos); this.wellT = k; }
 
   // Spell reactions: casting pulls petals in then bursts them; Repel Palm also gusts the wind.
   onSpell(pos, kind) {

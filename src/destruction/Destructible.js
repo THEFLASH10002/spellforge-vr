@@ -61,10 +61,11 @@ export class Destructible {
     this.shatter(other.mesh.position, dir.divideScalar(speed), speed);
   }
 
-  shatter(point, dir, speed = 8, delay = 0) {
+  // pull = true: fragments are drawn toward `point` (Gravity Well) instead of thrown away from it.
+  shatter(point, dir, speed = 8, pull = false) {
     if (this.broken) return;
     this.broken = true;
-    this.onShatter?.(point, dir, speed); // lets a GLB skin hide and the rest of its structure follow
+    this.onShatter?.(point, dir, speed, pull); // lets a GLB skin hide and the rest of its structure follow
     fx.burst(point, 0xffe0a0, 28, 4);
     this.physics.untag(this.collider);
     this.physics.world.removeCollider(this.collider, true);
@@ -79,17 +80,19 @@ export class Destructible {
       if (!desc) { f.geometry.computeBoundingSphere(); desc = R.ColliderDesc.ball(f.geometry.boundingSphere.radius); }
       this.physics.world.createCollider(desc.setRestitution(0.1).setFriction(0.8), body);
       const away = new THREE.Vector3().copy(f.position).sub(point).normalize();
-      const k = 2 + Math.random() * 3;
+      if (pull) away.negate();
+      const k = pull ? 1.5 + Math.random() * 2 : 2 + Math.random() * 3, dk = pull ? 0 : speed * 0.25;
       body.setLinvel({
-        x: away.x * k + dir.x * speed * 0.25,
-        y: away.y * k + dir.y * speed * 0.25 + 1.5,
-        z: away.z * k + dir.z * speed * 0.25,
+        x: away.x * k + dir.x * dk,
+        y: away.y * k + dir.y * dk + (pull ? 0.5 : 1.5),
+        z: away.z * k + dir.z * dk,
       }, true);
       body.setAngvel({ x: (Math.random() - 0.5) * 8, y: (Math.random() - 0.5) * 8, z: (Math.random() - 0.5) * 8 }, true);
-      this.physics.synced.push({ mesh: f, body });
+      this.physics.synced.push({ mesh: f, body, debris: true });
       this.live.push({ mesh: f, ttl: 7 + Math.random() * 2 });
     }
-    for (const d of this.dependents) this.pending.push({ t: 0.12 + Math.random() * 0.2, fn: () => d.shatter(point, dir, speed * 0.4) });
+    this.physics.trimDebris(200);
+    for (const d of this.dependents) this.pending.push({ t: 0.12 + Math.random() * 0.2, fn: () => d.shatter(point, dir, speed * 0.4, pull) });
   }
 
   update(dt) {

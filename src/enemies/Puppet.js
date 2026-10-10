@@ -60,7 +60,8 @@ export class Puppet {
   }
 
   // Ragdoll (same entry point name as Destructible so Arts treat both alike).
-  shatter(point, dir, speed = 8) {
+  // pull = true: ragdoll parts are dragged toward `point` (Gravity Well) instead of thrown away.
+  shatter(point, dir, speed = 8, pull = false) {
     if (this.broken) return;
     this.broken = true;
     fx.burst(this.center, 0xffe0a0, 20, 3);
@@ -79,7 +80,7 @@ export class Puppet {
       w.createCollider(R.ColliderDesc.cuboid(...part.def.h).setCollisionGroups(PUPPET_GROUPS)
         .setRestitution(0.1).setFriction(0.9).setDensity(0.6), body);
       part.body = body;
-      this.physics.synced.push({ mesh: m, body });
+      this.physics.synced.push({ mesh: m, body, ragdoll: true });
     }
     const a = new THREE.Vector3();
     for (const part of Object.values(this.parts)) {
@@ -93,7 +94,10 @@ export class Puppet {
         parent.body, part.body, true);
     }
     for (const part of Object.values(this.parts)) {
-      part.body.setLinvel({ x: dir.x * speed * 0.4, y: dir.y * speed * 0.4 + 2.5, z: dir.z * speed * 0.4 }, true);
+      if (pull) {
+        const to = new THREE.Vector3().copy(point).sub(part.mesh.position).normalize().multiplyScalar(3);
+        part.body.setLinvel({ x: to.x, y: to.y + 1, z: to.z }, true);
+      } else part.body.setLinvel({ x: dir.x * speed * 0.4, y: dir.y * speed * 0.4 + 2.5, z: dir.z * speed * 0.4 }, true);
       part.body.setAngvel({ x: (Math.random() - 0.5) * 6, y: (Math.random() - 0.5) * 6, z: (Math.random() - 0.5) * 6 }, true);
     }
   }
@@ -112,10 +116,18 @@ export class Puppet {
     }
   }
 
+  // A standing puppet leans and shudders toward a pulling force (call every frame while pulled).
+  struggle(dir, k) {
+    this.pullDir ||= new THREE.Vector3();
+    this.pullDir.copy(dir); this.pullK = Math.max(this.pullK || 0, k);
+  }
+
   update(dt, t) {
     if (this.broken) return;
-    const s = Math.sin(t * 1.6 + this.phase);
-    this.group.rotation.z = s * 0.03;
+    const s = Math.sin(t * 1.6 + this.phase), lean = this.pullK || 0;
+    this.group.rotation.z = s * 0.03 + (lean ? -this.pullDir.x * lean * 0.4 + Math.sin(t * 40) * lean * 0.02 : 0);
+    this.group.rotation.x = lean ? this.pullDir.z * lean * 0.4 : 0;
+    this.pullK = Math.max(0, lean - dt * 4);
     this.parts.head.mesh.rotation.y = Math.sin(t * 0.8 + this.phase) * 0.4;
     this.parts.armL.mesh.rotation.z = s * 0.08;
     this.parts.armR.mesh.rotation.z = -s * 0.08;
