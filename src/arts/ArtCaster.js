@@ -5,6 +5,7 @@ import { ARTS } from './ArtRegistry.js';
 export class ArtCaster {
   constructor(scene, physics) {
     this.scene = scene; this.physics = physics; this.live = [];
+    this.destructibles = []; // pieces the push Art can shatter directly
   }
 
   cast(artId, hand) {
@@ -17,7 +18,8 @@ export class ArtCaster {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 8), new THREE.MeshBasicMaterial({ color: art.color }));
     m.position.copy(hand.tip).addScaledVector(hand.fwd, 0.1);
     this.scene.add(m);
-    this.physics.addDynamicSphere(m, 0.05, hand.fwd.clone().multiplyScalar(14));
+    const tag = { isProjectile: true, mesh: m };
+    tag.body = this.physics.addDynamicSphere(m, 0.05, hand.fwd.clone().multiplyScalar(14), tag);
     this.live.push({ mesh: m, ttl: 6 });
   }
 
@@ -29,6 +31,12 @@ export class ArtCaster {
     this.scene.add(ring);
     this.live.push({ mesh: ring, ttl: 0.4, fx: true });
     const to = new THREE.Vector3();
+    for (const d of this.destructibles) {
+      if (d.broken) continue;
+      to.copy(d.mesh.position).sub(hand.wrist);
+      const dist = to.length();
+      if (dist < 6 && to.normalize().dot(dir) > 0.85) d.shatter(hand.wrist, dir, 10);
+    }
     for (const { mesh, body } of this.physics.synced) {
       to.copy(mesh.position).sub(hand.wrist);
       const dist = to.length();

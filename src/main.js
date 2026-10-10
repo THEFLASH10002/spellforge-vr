@@ -9,6 +9,7 @@ import { BUILTINS } from './gestures/builtins.js';
 import { ArtCaster } from './arts/ArtCaster.js';
 import { ART_IDS, ARTS } from './arts/ArtRegistry.js';
 import { Panel } from './ui/Panel.js';
+import { buildDistrict } from './destruction/District.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(1);
@@ -57,10 +58,13 @@ for (let i = 0; i < 6; i++) {
   physics.addDynamicBox(b, 0.2, 0.2, 0.2);
 }
 
+const district = buildDistrict(physics, scene);
+
 const recognizer = new Recognizer();
 recognizer.sigils = [...BUILTINS, ...loadCustom()];
 const recorder = new Recorder(recognizer);
 const caster = new ArtCaster(scene, physics);
+caster.destructibles = district.pieces;
 let lastCast = '-';
 let nextArt = 0;
 recognizer.onCast = (sigil, hand) => {
@@ -113,6 +117,7 @@ renderer.setAnimationLoop(() => {
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
   if (recorder.active) recorder.update(dt, L, R, headInv); else recognizer.update(dt, L, R, headInv);
   caster.update(dt);
+  district.update(dt);
   panel.poke([L?.tip, R?.tip], performance.now());
   updateHud(dt, R);
   renderer.render(scene, camera);
