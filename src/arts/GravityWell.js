@@ -132,7 +132,7 @@ export class GravityWell {
   }
 
   launch(dir) {
-    this.state = 'flying'; this.dir.copy(dir); this.life = this.cfg.lifetime; this.cool = this.cfg.cooldown; this.hist = []; this.fast = 0;
+    this.state = 'flying'; this.fT = 0; this.dir.copy(dir); this.life = this.cfg.lifetime; this.cool = this.cfg.cooldown; this.hist = []; this.fast = 0;
     this.trail = new Trail(this.scene, this.v.color, 20);
     fx.burst(this.pos, this.v.light, 30, 3);
     fx.shock(this.pos, dir, this.v.color, 1.5);
@@ -140,7 +140,7 @@ export class GravityWell {
 
   // ---- flight --------------------------------------------------------------------------------------
   flying(dt, head) {
-    const c = this.charge, radius = 0.07 + 0.05 * c, step = this.cfg.speed * dt, R = this.physics.R;
+    const c = this.charge, radius = 0.09 + 0.05 * c, step = this.cfg.speed * dt, R = this.physics.R;
     const ray = new R.Ray({ x: this.pos.x, y: this.pos.y, z: this.pos.z }, { x: this.dir.x, y: this.dir.y, z: this.dir.z });
     const hit = this.physics.world.castRay(ray, step + radius, true, R.QueryFilterFlags.EXCLUDE_DYNAMIC);
     if (hit) {
@@ -153,6 +153,8 @@ export class GravityWell {
     this.pos.addScaledVector(this.dir, step);
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, Math.max(c, 0.5), radius);
+    this.fT += dt;
+    if (this.v.sign > 0) this.orb.setHorizon(radius * 1.9 * smooth(clamp01(this.fT / 0.25)), 1); // thrown ball = void + photon ring
     this.trail.push(this.pos);
     this.trail.update(head, 0.05 + 0.05 * c);
     fx.burst(this.pos, this.v.light, 2, 0.8);
@@ -168,7 +170,7 @@ export class GravityWell {
     this.state = 'singularity'; this.sT = 0; this.second = false;
     this.singT = this.cfg.singularity * (0.8 + 0.2 * this.mult);
     this.trail?.dispose(); this.trail = null;
-    fx.shock(this.pos, UP, this.v.color, 4 + 2 * this.charge);
+    fx.shock(this.pos, UP, this.v.color, 5 + 3 * this.charge, 1.8); // lingers long after the orb has shrunk back
     fx.burst(this.pos, this.v.light, 40, 5);
     if (this.v.sign < 0) this.blast();
     this.destroyNear(this.cfg.destroyBase + this.cfg.destroyPerCharge * this.charge);
@@ -210,11 +212,15 @@ export class GravityWell {
     }
 
     // Visual: swell, hold, then collapse into a flash.
-    const grow = 0.12 + 0.05 * c + 0.015 * Math.sin(this.clock * 9);
+    // Radius profile: swell with the explosion (0-0.3 s), hold a beat, shrink back in (0.5-1.2 s), then settle.
+    const rest = 0.12 + 0.05 * c, peak = (0.5 + 0.4 * c) * (this.v.sign > 0 ? 1 : 0.9), sT = this.sT;
+    const swell = sT < 0.3 ? 1 - (1 - sT / 0.3) ** 3 : 1;
+    const shrink = smooth(clamp01((sT - 0.5) / 0.7));
+    const grow = rest + (peak - rest) * swell * (1 - shrink) + 0.015 * Math.sin(this.clock * 9);
     const collapse = k > 0.85 ? 1 - smooth((k - 0.85) / 0.15) : 1;
     const dustY = Math.max(0.1, this.pos.y - terrainHeight(this.pos.x, this.pos.z));
     this.orb.update(this.clock, dt, 1, grow * collapse, 1, dustY);
-    if (this.v.sign > 0) this.orb.setHorizon(grow * collapse * 1.9 * smooth(clamp01(this.sT / 0.35)), 1); // black void + photon ring
+    if (this.v.sign > 0) this.orb.setHorizon(grow * collapse * 1.9, 1); // black void + photon ring
     this.status = `collapsing ${Math.max(0, this.singT - this.sT).toFixed(1)}s`;
     this.moodTarget = 1.0;
     if (this.sT >= this.singT) this.collapse(true);
@@ -223,7 +229,7 @@ export class GravityWell {
   collapse(flash) {
     if (flash) {
       fx.burst(this.pos, this.v.light, 80, 7);
-      fx.shock(this.pos, UP, this.v.color, 6);
+      fx.shock(this.pos, UP, this.v.color, 7, 1.4);
       this.env.onSpell(this.pos, 'cast'); // petals puff outward with the final flash
       if (this.v.sign > 0) for (const e of this.physics.synced) { // brief outward release as it winks out
         if (e.projectile) continue;
