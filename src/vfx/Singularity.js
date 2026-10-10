@@ -191,11 +191,11 @@ export function createOrb(pal = PAL_BLUE) {
   return {
     group, halo,
     // Show the event horizon (meters; 0 hides it). Used for the Gravity Well's collapse phase.
-    setHorizon(radius, opacity = 1) {
+    setHorizon(radius, opacity = 1, glow = 3.4) {
       horizon.visible = radius > 0.005;
       hm.uniforms.uRadius.value = radius; hm.uniforms.uSize.value = radius * 3.4;
       hm.uniforms.uEdge.value = radius * 0.06; hm.uniforms.uRingWidth.value = radius * 0.1; hm.uniforms.uHalo.value = radius * 0.7;
-      hm.uniforms.uOpacity.value = opacity;
+      hm.uniforms.uOpacity.value = opacity; hm.uniforms.uRingGlow.value = glow;
     },
     // radius: meters; charge: 0..1; dust: 0..1 (singularity ground dust); dustY: meters above ground.
     update(t, dt, charge, radius, dust = 0, dustY = 0) {
