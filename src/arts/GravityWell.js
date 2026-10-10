@@ -102,7 +102,7 @@ export class GravityWell {
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, c, radius);
     this.lastRadius = radius;
-    if (this.v.sign > 0) this.orb.setHorizon(radius * 1.45 * smooth(clamp01(this.t / 0.4)), 1, 2 + 2 * c); // held orb = void + photon ring (kept hand-sized)
+    this.orb.setHorizon(radius * 1.45 * smooth(clamp01(this.t / 0.4)), 1, 2 + 2 * c); // held orb = void + photon ring (kept hand-sized)
     this.status = `charging ${Math.round(c * 100)}%`;
     this.moodTarget = 0.15 + 0.6 * c; // the world darkens and turns blue as it charges
 
@@ -157,7 +157,7 @@ export class GravityWell {
     this.orb.group.position.copy(this.pos);
     this.orb.update(this.clock, dt, Math.max(c, 0.5), radius);
     this.fT += dt;
-    if (this.v.sign > 0) this.orb.setHorizon(radius * (1.45 + 0.45 * smooth(clamp01(this.fT / 0.2))), 1, 3.4); // thrown ball = void + photon ring, easing up from the held size
+    this.orb.setHorizon(radius * (1.45 + 0.45 * smooth(clamp01(this.fT / 0.2))), 1, 3.4); // thrown ball = void + photon ring, easing up from the held size
     this.trail.push(this.pos);
     this.trail.update(head, 0.05 + 0.05 * c);
     fx.burst(this.pos, this.v.light, 2, 0.8);
@@ -223,7 +223,7 @@ export class GravityWell {
     const collapse = k > 0.85 ? 1 - smooth((k - 0.85) / 0.15) : 1;
     const dustY = Math.max(0.1, this.pos.y - terrainHeight(this.pos.x, this.pos.z));
     this.orb.update(this.clock, dt, 1, grow * collapse, 1, dustY);
-    if (this.v.sign > 0) this.orb.setHorizon(grow * collapse * 1.9, 1); // black void + photon ring
+    this.orb.setHorizon(grow * collapse * 1.9, 1); // black void + photon ring
     this.status = `collapsing ${Math.max(0, this.singT - this.sT).toFixed(1)}s`;
     this.moodTarget = 1.0;
     if (this.sT >= this.singT) this.collapse(true);

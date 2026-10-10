@@ -107,7 +107,7 @@ const horizonMat = pal => new THREE.ShaderMaterial({
   transparent: true, depthWrite: false, depthTest: true, blending: THREE.NormalBlending, side: THREE.DoubleSide, fog: false,
   uniforms: {
     uTime: { value: 0 }, uCentre: { value: new THREE.Vector3() }, uSize: { value: 1 }, uRadius: { value: 0.3 }, uEdge: { value: 0.02 },
-    uRing: { value: 1.16 }, uRingWidth: { value: 0.03 }, uRingGlow: { value: 3.4 }, uDoppler: { value: 0.55 },
+    uRing: { value: 1.16 }, uRingWidth: { value: 0.03 }, uRingGlow: { value: 3.4 }, uDoppler: { value: pal.doppler ?? 0.55 }, // sign flips which side is bright (spin direction)
     uHalo: { value: 0.22 }, uHaloGlow: { value: 1.3 }, uRim: { value: 0.5 }, uShimmer: { value: 0.12 }, uOpacity: { value: 1 },
     uVoid: { value: new THREE.Color(pal.voidC) }, uRimC: { value: new THREE.Color(pal.rimC) },
     uRingC: { value: new THREE.Color(pal.ringC) }, uHaloC: { value: new THREE.Color(pal.haloC) },
@@ -141,7 +141,7 @@ const horizonMat = pal => new THREE.ShaderMaterial({
 });
 
 export const PAL_BLUE = { coreA: 0x0f66ff, coreB: 0xb3ebff, aura1: 0x1f7fff, aura2: 0x4fc8ff, ribA: 0x26a6ff, ribB: 0xe6ffff, partA: 0x33bfff, partB: 0xffffff, spark: 0x99e6ff, halo: 0x2f8fff, out: false, voidC: 0x03060f, rimC: 0x1f5fe0, ringC: 0xe6f6ff, haloC: 0x3a9bff };
-export const PAL_RED = { coreA: 0xff1a0a, coreB: 0xffd2a0, aura1: 0xff2a14, aura2: 0xff8a3a, ribA: 0xff3a1a, ribB: 0xfff0d0, partA: 0xff3a22, partB: 0xffe0b0, spark: 0xffa060, halo: 0xff3a14, out: true, voidC: 0x120204, rimC: 0xc02010, ringC: 0xfff0d8, haloC: 0xff5a1a };
+export const PAL_RED = { coreA: 0xff1a0a, coreB: 0xffd2a0, aura1: 0xff2a14, aura2: 0xff8a3a, ribA: 0xff3a1a, ribB: 0xfff0d0, partA: 0xff3a22, partB: 0xffe0b0, spark: 0xffa060, halo: 0xff3a14, out: true, doppler: -0.55, voidC: 0x120204, rimC: 0xc02010, ringC: 0xfff0d8, haloC: 0xff5a1a };
 
 export function createOrb(pal = PAL_BLUE) {
   const group = new THREE.Group();
