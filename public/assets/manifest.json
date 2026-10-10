@@ -1,9 +1,9 @@
 {
   "slots": {
-    "machiya": { "file": "models/machiya.glb", "fitHeight": 2.8 },
-    "pagoda": { "file": "models/pagoda.glb", "fitHeight": 4.2 },
-    "torii": { "file": "models/torii.glb", "fitHeight": 3.43 },
-    "lantern": { "file": "models/lantern.glb", "fitHeight": 0.6, "outline": false }
+    "machiya": { "file": "models/machiya.glb", "fitHeight": 4.5 },
+    "pagoda": { "file": "models/pagoda.glb", "fitHeight": 7 },
+    "torii": { "file": "models/torii.glb", "fitHeight": 4.6 },
+    "lantern": { "file": "models/lantern.glb", "fitHeight": 0.75, "y": 1.55, "outline": false }
   },
   "decor": []
 }

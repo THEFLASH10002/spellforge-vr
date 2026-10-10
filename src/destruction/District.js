@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { Destructible } from './Destructible.js';
 
-// Japanese-vernacular district. Pieces are simple pre-fractured proxies (collision + debris).
-// If a GLB exists for a structure's slot (see AssetManager / ASSETS.md) it is shown instead of the
-// proxies until the first hit, then the whole structure collapses into the proxy debris.
+// Japanese-vernacular district, scaled against 1.8 m puppets. Pieces are simple pre-fractured
+// proxies (collision + debris). If a GLB exists for a structure's slot (see AssetManager / ASSETS.md)
+// it is shown instead of the proxies until the first hit, then the whole structure collapses.
 export function buildDistrict(physics, scene, assets) {
   const all = [];
   const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
@@ -31,42 +31,44 @@ export function buildDistrict(physics, scene, assets) {
     }
   };
 
-  // Machiya: with a GLB there is one wide house (proxy sized to its ~5 x 3.3 m footprint);
-  // otherwise two procedural rowhouses (plaster body + tiled roof).
-  const house = assets?.get('machiya', { fitHeight: 2.8 });
+  // Machiya: with a GLB, one wide house (~8.8 x 5.3 m footprint at 4.5 m tall); otherwise two rowhouses.
+  const house = assets?.get('machiya', { fitHeight: 4.5 });
   if (house) {
-    const body = piece(box(5, 2.4, 3.2), -1.85, 1.2, -6, 0xe8e0d0, 22);
-    const roof = piece(box(5.5, 0.4, 3.6), -1.85, 2.6, -6, 0x2f3440, 14);
+    const hx = -6.5, hz = -9;
+    const body = piece(box(8.6, 3.8, 5.0), hx, 1.9, hz, 0xe8e0d0, 24);
+    const roof = piece(box(9.4, 0.8, 5.8), hx, 4.1, hz, 0x2f3440, 14);
     stack(body, roof);
-    skinned(house, -1.85, -6, [body, roof]);
+    skinned(house, hx, hz, [body, roof]);
   } else {
-    [[-3.2, 0xe8e0d0], [-0.5, 0xd8cdb8]].forEach(([x, c]) => {
-      const body = piece(box(2.4, 2.2, 2), x, 1.1, -6, c, 16);
-      const roof = piece(box(2.9, 0.25, 2.5), x, 2.325, -6, 0x2f3440, 10);
+    [[-8.2, 0xe8e0d0], [-4.6, 0xd8cdb8]].forEach(([x, c]) => {
+      const body = piece(box(3.6, 3.4, 3.2), x, 1.7, -9, c, 18);
+      const roof = piece(box(4.3, 0.5, 3.8), x, 3.65, -9, 0x2f3440, 12);
       stack(body, roof);
     });
   }
 
-  // Pagoda: three tiers with eaves.
-  const px = 3.8, pz = -7;
-  const base = piece(box(2, 1, 2), px, 0.5, pz, 0x7a3b2a, 14);
-  const t1 = piece(box(1.5, 0.9, 1.5), px, 1.45, pz, 0xa03030, 12);
-  const r1 = piece(box(2.3, 0.16, 2.3), px, 2.03, pz, 0x2f3440, 10);
-  const t2 = piece(box(1.15, 0.8, 1.15), px, 2.51, pz, 0xa03030, 12);
-  const r2 = piece(box(1.9, 0.14, 1.9), px, 3.0, pz, 0x2f3440, 10);
-  const t3 = piece(box(0.8, 0.7, 0.8), px, 3.42, pz, 0xa03030, 10);
-  const r3 = piece(box(1.4, 0.14, 1.4), px, 3.84, pz, 0x2f3440, 8);
+  // Pagoda: three tiers with eaves, scaled so the whole thing is ~7 m tall.
+  const pk = 7 / 3.91, px = 5.8, pz = -8.5;
+  const tier = (w, h, d, y, color, n) => piece(box(w * pk, h * pk, d * pk), px, y * pk, pz, color, n);
+  const base = tier(2, 1, 2, 0.5, 0x7a3b2a, 14);
+  const t1 = tier(1.5, 0.9, 1.5, 1.45, 0xa03030, 12);
+  const r1 = tier(2.3, 0.16, 2.3, 2.03, 0x2f3440, 10);
+  const t2 = tier(1.15, 0.8, 1.15, 2.51, 0xa03030, 12);
+  const r2 = tier(1.9, 0.14, 1.9, 3.0, 0x2f3440, 10);
+  const t3 = tier(0.8, 0.7, 0.8, 3.42, 0xa03030, 10);
+  const r3 = tier(1.4, 0.14, 1.4, 3.84, 0x2f3440, 8);
   stack(base, t1, r1, t2, r2, t3, r3);
-  skinned(assets?.get('pagoda', { fitHeight: 3.91 }), px, pz, [base, t1, r1, t2, r2, t3, r3]);
+  skinned(assets?.get('pagoda', { fitHeight: 7 }), px, pz, [base, t1, r1, t2, r2, t3, r3]);
 
-  // Torii gate.
-  const tx = 0.6, tz = -10;
-  const pl = piece(new THREE.CylinderGeometry(0.18, 0.2, 3.2, 12), tx - 1.4, 1.6, tz, 0xd2402a, 12);
-  const pr = piece(new THREE.CylinderGeometry(0.18, 0.2, 3.2, 12), tx + 1.4, 1.6, tz, 0xd2402a, 12);
-  const nuki = piece(box(3, 0.18, 0.25), tx, 2.5, tz, 0xd2402a, 8);
-  const kasagi = piece(box(3.9, 0.25, 0.35), tx, 3.3, tz, 0x1c1c22, 10);
+  // Torii gate, ~4.6 m tall.
+  const tk = 4.6 / 3.43, tx = 0, tz = -8;
+  const cyl = (x) => new THREE.CylinderGeometry(0.18 * tk, 0.2 * tk, 3.2 * tk, 12);
+  const pl = piece(cyl(), tx - 1.4 * tk, 1.6 * tk, tz, 0xd2402a, 12);
+  const pr = piece(cyl(), tx + 1.4 * tk, 1.6 * tk, tz, 0xd2402a, 12);
+  const nuki = piece(box(3 * tk, 0.18 * tk, 0.25 * tk), tx, 2.5 * tk, tz, 0xd2402a, 8);
+  const kasagi = piece(box(3.9 * tk, 0.25 * tk, 0.35 * tk), tx, 3.3 * tk, tz, 0x1c1c22, 10);
   pl.dependents.push(nuki, kasagi); pr.dependents.push(nuki, kasagi);
-  skinned(assets?.get('torii', { fitHeight: 3.43 }), tx, tz, [pl, pr, nuki, kasagi]);
+  skinned(assets?.get('torii', { fitHeight: 4.6 }), tx, tz, [pl, pr, nuki, kasagi]);
 
   return {
     pieces: all,

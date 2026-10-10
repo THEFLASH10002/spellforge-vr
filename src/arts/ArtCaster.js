@@ -34,7 +34,7 @@ export class ArtCaster {
       if (d.broken) continue;
       to.copy(d.center || d.mesh.position).sub(hand.wrist);
       const dist = to.length();
-      if (dist < 6 && to.normalize().dot(dir) > 0.85) d.shatter(hand.wrist, dir, 10);
+      if (dist < 12 && to.normalize().dot(dir) > 0.85) d.shatter(hand.wrist, dir, 10);
     }
     for (const { mesh, body } of this.physics.synced) {
       to.copy(mesh.position).sub(hand.wrist);
