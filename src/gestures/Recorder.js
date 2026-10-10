@@ -21,6 +21,7 @@ export class Recorder {
     this.message = '';
   }
   get active() { return this.phase !== 'idle'; }
+  cancel() { this.phase = 'idle'; this.frames = []; this.message = ''; }
 
   start(mode, artId) {
     Object.assign(this, { mode, artId, phase: 'countdown', t: COUNTDOWN, frames: [], message: '' });

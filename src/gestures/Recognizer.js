@@ -41,6 +41,8 @@ export class Recognizer {
       const tries = sg.hand === 'any' ? [['left', L?.vec], ['right', R?.vec]] : [[sg.hand, (sg.hand === 'left' ? L : R)?.vec]];
       for (const [h, vec] of tries) {
         if (!vec) continue;
+        const mean = (vec[1] + vec[2] + vec[3] + vec[4]) / 4; // average straightness of index..pinky
+        if ((sg.minCurl && mean < sg.minCurl) || (sg.maxCurl && mean > sg.maxCurl)) continue; // hard gate, independent of palm direction
         const cand = { sg, hand: h, ratio: distance(vec, sg.vec, sg.w) / sg.thresh };
         if (!bestOne || cand.ratio < bestOne.ratio) bestOne = cand;
         if (!single[h] || cand.ratio < single[h].ratio) single[h] = cand;

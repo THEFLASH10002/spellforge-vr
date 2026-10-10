@@ -28,6 +28,7 @@ import { WellMood, MOOD } from './vfx/WellMood.js';
 import { NullOrb, NULL } from './arts/NullOrb.js';
 import { Spellbook } from './ui/Spellbook.js';
 import { Locomotion } from './world/Locomotion.js';
+import { HandLabels } from './ui/HandLabels.js';
 import { Unlocks, recipeFor, recipeOf, UNLOCK_NAMES } from './progress/Unlocks.js';
 import { HandInteract } from './world/HandInteract.js';
 
@@ -79,7 +80,10 @@ const puppets = [[-4, -5], [-1, -6.5], [2.5, -5.5], [5.5, -2.5]].map(([x, z], i)
 const recognizer = new Recognizer();
 recognizer.sigils = [...BUILTINS, ...loadCustom()];
 const unlocks = new Unlocks(); // starts with only Bolt, Pull and Repel; Blue, Red and Purple are earned by combining (see progress/Unlocks.js)
-for (const s of recognizer.sigils) if (!s.builtin) unlocks.unlock(s.artId, { silent: true }); // a saved custom sign keeps its spell unlocked
+{ // saved custom signs bound to a spell that is still locked can't exist (e.g. made with the old debug recorder): drop them
+  const stale = recognizer.sigils.filter(s => !s.builtin && unlocks.isLocked(s.artId));
+  if (stale.length) { recognizer.sigils = recognizer.sigils.filter(s => !stale.includes(s)); saveCustom(recognizer.sigils); }
+}
 recognizer.isLocked = sg => unlocks.isLocked(sg.artId);         // locked spells' signs do nothing
 recognizer.canCombine = rec => unlocks.isLocked(rec.result);    // two base signs only combine toward something not yet unlocked
 const artChoices = () => ART_IDS.filter(id => unlocks.has(id)); // "Next Art" / "Rebind" only offer unlocked spells
@@ -115,7 +119,8 @@ const tryFuse = (a, b) => {
   if (!unlocks.unlock(rec.result)) return { status: 'known', result: rec.result };
   return { status: 'unlocked', result: rec.result };
 };
-const spellbook = new Spellbook({ scene, assets, getPages: spellPages, tryFuse });
+const spellbook = new Spellbook({ scene, assets, getPages: spellPages, tryFuse, recorder, getArts: artChoices, persist: () => saveCustom(recognizer.sigils) });
+const labels = new HandLabels({ scene, getSigils: () => recognizer.sigils, isLocked: sg => unlocks.isLocked(sg.artId) }); // words under your hands while creating
 recorder.onSaved = s => spellbook.discover(s);
 recorder.onChanged = () => spellbook.refresh();
 unlocks.onUnlock(id => spellbook.celebrate(id)); // ONE popup per spell, ever: unlock() only reports true the first time
@@ -159,43 +164,21 @@ const panel = new Panel();
 panel.mesh.position.set(-0.55, 1.2, -0.7);
 panel.mesh.rotation.y = 0.6;
 scene.add(panel.mesh);
-[['Rec Right', 'right', 10, 370], ['Rec Left', 'left', 176, 370], ['Rec Two', 'two', 342, 370]].forEach(([label, mode, x, y]) =>
-  panel.addButton({ label, x, y, w: 160, h: 70, onPress: () => !recorder.active && recorder.start(mode, curArt()) }));
 panel.addButton({ label: 'RESET', x: 10, y: 290, w: 118, h: 70, onPress: () => director.reset() });
 panel.addButton({ label: 'Sanctum', x: 136, y: 290, w: 118, h: 70, onPress: () => sanctum.activate(presetIdx, ruleIdx) });
 panel.addButton({ label: 'Look', x: 262, y: 290, w: 118, h: 70, onPress: () => { presetIdx = (presetIdx + 1) % PRESETS.length; } });
 panel.addButton({ label: 'Rule', x: 388, y: 290, w: 114, h: 70, onPress: () => { ruleIdx = (ruleIdx + 1) % RULES.length; } });
-panel.addButton({ label: 'Next Art', x: 10, y: 450, w: 240, h: 70, onPress: () => { nextArt = (nextArt + 1) % artChoices().length; } });
-panel.addButton({ label: 'Clear Custom', x: 262, y: 450, w: 240, h: 70, onPress: () => recorder.clearCustom() });
-
-// Gravity Well fallbacks: start charging without the hand sign, and launch without a throw.
-panel.addButton({ label: 'Well: Charge', x: 10, y: 610, w: 240, h: 70, onPress: () => (unlocks.has('well') ? well.begin('right') : say('well')) });
-panel.addButton({ label: 'Well: Launch', x: 262, y: 610, w: 240, h: 70, onPress: () => well.launchNow() });
-
-panel.addButton({ label: 'Red: Charge', x: 10, y: 690, w: 240, h: 70, onPress: () => (unlocks.has('repulsor') ? red.begin('left') : say('repulsor')) });
-panel.addButton({ label: 'Red: Launch', x: 262, y: 690, w: 240, h: 70, onPress: () => red.launchNow() });
-
-panel.addButton({ label: 'Null: Merge', x: 10, y: 770, w: 240, h: 70, onPress: () => (unlocks.has('nullpoint') ? nullOrb.begin() : say('nullpoint')) });
-panel.addButton({ label: 'Null: Launch', x: 262, y: 770, w: 240, h: 70, onPress: () => nullOrb.launchNow() });
-
-panel.addButton({ label: 'Reset Progress', x: 10, y: 850, w: 492, h: 70, onPress: () => { unlocks.reset(); recorder.clearCustom(); lastCast = 'Progress reset: only Bolt, Pull, Repel'; spellbook.refresh(); } });
-
-// Forge: name / rebind the most recent custom Sigil.
-const ADJ = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron'];
-const NOUN = ['Fang', 'Crown', 'Veil', 'Tide', 'Spiral', 'Lantern', 'Thorn', 'Echo', 'Comet', 'Gate'];
-let nameIdx = 0;
+// Developer tools. Creating spells is done in the spellbook: CREATE button under the pages.
+panel.addButton({ label: 'Clear Custom', x: 10, y: 370, w: 240, h: 70, onPress: () => recorder.clearCustom() });
+panel.addButton({ label: 'Reset Progress', x: 262, y: 370, w: 240, h: 70, onPress: () => { spellbook.endCreate?.(); unlocks.reset(); recorder.clearCustom(); lastCast = 'Progress reset: only Bolt, Pull, Repel'; spellbook.refresh(); } });
+// Fallbacks (respect the locks): start charging without the hand sign, and launch without a throw.
+panel.addButton({ label: 'Well: Charge', x: 10, y: 450, w: 240, h: 70, onPress: () => (unlocks.has('well') ? well.begin('right') : say('well')) });
+panel.addButton({ label: 'Well: Launch', x: 262, y: 450, w: 240, h: 70, onPress: () => well.launchNow() });
+panel.addButton({ label: 'Red: Charge', x: 10, y: 530, w: 240, h: 70, onPress: () => (unlocks.has('repulsor') ? red.begin('left') : say('repulsor')) });
+panel.addButton({ label: 'Red: Launch', x: 262, y: 530, w: 240, h: 70, onPress: () => red.launchNow() });
+panel.addButton({ label: 'Null: Merge', x: 10, y: 610, w: 240, h: 70, onPress: () => (unlocks.has('nullpoint') ? nullOrb.begin() : say('nullpoint')) });
+panel.addButton({ label: 'Null: Launch', x: 262, y: 610, w: 240, h: 70, onPress: () => nullOrb.launchNow() });
 const lastCustom = () => [...recognizer.sigils].reverse().find(s => !s.builtin);
-panel.addButton({ label: 'Rename Last', x: 10, y: 530, w: 240, h: 70, onPress: () => {
-  const s = lastCustom(); if (!s) return;
-  nameIdx++;
-  s.name = `${ADJ[nameIdx % ADJ.length]} ${NOUN[(nameIdx * 7 + 3) % NOUN.length]}`;
-  saveCustom(recognizer.sigils); spellbook.refresh();
-} });
-panel.addButton({ label: 'Rebind Last', x: 262, y: 530, w: 240, h: 70, onPress: () => {
-  const s = lastCustom(); if (!s) return;
-  const ch = artChoices(); s.artId = ch[(ch.indexOf(s.artId) + 1) % ch.length];
-  saveCustom(recognizer.sigils); spellbook.refresh();
-} });
 
 const headQ = new THREE.Quaternion(), headPos = new THREE.Vector3(), headFwd = new THREE.Vector3(0, 0, -1);
 let hudT = 0;
@@ -213,7 +196,7 @@ function updateHud(dt, R) {
       : `${lastCast} | ${[['Blue', well], ['Red', red], ['Null', nullOrb]].filter(([, o]) => o.status !== 'ready').map(([n, o]) => `${n} ${o.status}`).join(' | ') || 'ready'}`,
     dbg ? `Best: ${dbg.sg.name} ${dbg.ratio.toFixed(2)} (<1 fires)` : 'Best: no hands',
     R ? `R curl ${R.curls.map(c => c.toFixed(2)).join(' ')}` : 'R hand: not tracked',
-    `Next record art: ${ARTS[curArt()].name} | Unlocked: ${[...new Set(recognizer.sigils.map(x => x.artId))].filter(id => unlocks.has(id)).length}/${new Set(recognizer.sigils.map(x => x.artId)).size}`,
+    `Spell creation: CREATE button under the book | Unlocked: ${[...new Set(recognizer.sigils.map(x => x.artId))].filter(id => unlocks.has(id)).length}/${new Set(recognizer.sigils.map(x => x.artId)).size}`,
     `Sanctum: ${PRESETS[presetIdx].name} + ${RULES[ruleIdx].name}`,
     `[${QUALITY_NAME}] ${perf.text}`,
     (c => c ? `Last custom: ${c.name} -> ${ARTS[c.artId]?.name}` : 'Last custom: none')(lastCustom()),
@@ -239,7 +222,7 @@ renderer.setAnimationLoop(() => {
   const lh = handBy('left'), rh = handBy('right');
   const L = lh && extractHand(lh, 'left', headInv), R = rh && extractHand(rh, 'right', headInv);
   recognizer.active = null;
-  if (recorder.active) recorder.update(dt, L, R, headInv); else {
+  if (recorder.active || spellbook.creating) recorder.update(dt, L, R, headInv); else {
     // A hand that is holding an orb is busy; the other hand can still sign (so you can hold Blue and Red together).
     const holding = h => nullOrb.active || (well.active && well.which === h) || (red.active && red.which === h);
     const busy = h => holding(h) || loco.pinching[h] || interact.isHolding(h); // pinching = aiming a teleport; holding an object = not signing
@@ -255,7 +238,7 @@ renderer.setAnimationLoop(() => {
   if (act && act.sg.artId === 'pull') { const hh = act.hand === 'left' ? L : R; if (hh) caster.pullHold(hh, dt); }
   headFwd.set(0, 0, -1).applyQuaternion(headQ);
   if (placeBook && (renderer.xr.isPresenting || !renderer.xr.enabled)) { spellbook.place(headPos, headFwd); placeBook = false; } // beside you on the left
-  spellbook.update(dt, clock.elapsedTime, headPos, headFwd); spellbook.poke([L?.tip, R?.tip], performance.now());
+  spellbook.update(dt, clock.elapsedTime, headPos, headFwd); labels.update(spellbook.creating, L, R); spellbook.poke([L?.tip, R?.tip], performance.now());
   caster.update(dt, headPos);
   fx.update(dt);
   env.update(dt, clock.elapsedTime, headPos);
@@ -268,4 +251,4 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
 });
 
-window.spellforge = { unlocks, interact, loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook
+window.spellforge = { labels, unlocks, interact, loco, recognizer, recorder, THREE, assets, camera, sanctum, env, caster, director, renderer, scene, well, WELL, red, RED, nullOrb, NULL, spellbook, mood, MOOD }; // debug/test hook

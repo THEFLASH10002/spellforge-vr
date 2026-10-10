@@ -33,7 +33,7 @@ export const BUILTINS = [
     w: handWeights({ curl: [0, 1, 1, 1, 1] }), // thumb ignored
   },
   {
-    id: 'repel-palm', name: 'Repel Palm', hand: 'any', artId: 'push', builtin: true, thresh: 0.15,
+    id: 'repel-palm', name: 'Repel Palm', hand: 'any', artId: 'push', builtin: true, thresh: 0.15, minCurl: 0.9, // fingers must be (nearly) straight
     vec: tpl([0.92, E, E, E, E], [0, 0, -1]), // open hand, palm facing away from head
     w: handWeights({ curl: [0.3, 1, 1, 1, 1], normal: 0.5 }), // thumb barely drops below 0.90, so low weight
   },
@@ -51,7 +51,7 @@ export const BUILTINS = [
   },
   {
     // Grasp: every finger curled a bit (a loose claw, ~0.86 straightness), palm facing forward. Yanks things toward you (Pull).
-    id: 'grasp', name: 'Grasp', hand: 'any', artId: 'pull', builtin: true, thresh: 0.17,
+    id: 'grasp', name: 'Grasp', hand: 'any', artId: 'pull', builtin: true, thresh: 0.17, maxCurl: 0.9, // an open hand can never be a claw
     vec: tpl([0.9, 0.86, 0.86, 0.86, 0.86], [0, 0, -1]),
     w: handWeights({ curl: [0.2, 1, 1, 1, 1], normal: 0.4 }), // thumb barely bends by this measure, palm roughly faces away
   },

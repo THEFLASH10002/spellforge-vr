@@ -147,13 +147,15 @@ function arrowTexture(dir) {
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
-function fuseTexture(active, text) {
+function fuseTexture(active, text, dim = false) {
   const c = document.createElement('canvas'); c.width = 320; c.height = 128;
-  const g = c.getContext('2d');
+  const g = c.getContext('2d'); g.globalAlpha = dim ? 0.45 : 1;
   g.shadowColor = active ? '#ffd86b' : '#b98cff'; g.shadowBlur = 20;
   g.fillStyle = active ? 'rgba(70,45,10,0.9)' : 'rgba(30,20,60,0.88)'; g.strokeStyle = active ? '#ffd86b' : '#d8c8ff'; g.lineWidth = 6;
   g.beginPath(); g.roundRect(8, 14, 304, 100, 40); g.fill(); g.stroke();
-  g.shadowBlur = 0; g.fillStyle = '#ffffff'; g.textAlign = 'center'; g.font = 'bold 54px Georgia, serif'; g.fillText(text, 160, 82);
+  g.shadowBlur = 0; g.fillStyle = '#ffffff'; g.textAlign = 'center'; let fs = 54; g.font = `bold ${fs}px Georgia, serif`;
+  while (g.measureText(text).width > 260 && fs > 24) { fs -= 4; g.font = `bold ${fs}px Georgia, serif`; }
+  g.fillText(text, 160, 82);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 
@@ -168,10 +170,88 @@ function drawBanner(ctx, title, sub, color) {
   if (sub) { fit(sub, 100, 940); ctx.shadowColor = color; ctx.shadowBlur = 36; ctx.fillStyle = '#ffffff'; ctx.fillText(sub, 512, 212); ctx.shadowBlur = 10; ctx.fillStyle = color; ctx.globalAlpha = 0.55; ctx.fillText(sub, 512, 212); ctx.globalAlpha = 1; }
 }
 
+// ---- creation wizard ---------------------------------------------------------------------------------------------------
+const HAND_OPTS = [['right', 'Right hand'], ['left', 'Left hand'], ['two', 'Both hands']];
+const NAME_A = ['Ember', 'Frost', 'Silent', 'Hollow', 'Gilded', 'Storm', 'Veiled', 'Crimson', 'Lunar', 'Iron', 'Astral', 'Verdant'];
+const NAME_N = ['Fang', 'Crown', 'Veil', 'Tide', 'Spiral', 'Lantern', 'Thorn', 'Echo', 'Comet', 'Gate', 'Sigil', 'Bloom'];
+const randomName = () => NAME_A[(Math.random() * NAME_A.length) | 0] + ' ' + NAME_N[(Math.random() * NAME_N.length) | 0];
+
+function drawFrame(ctx, color) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#1b1233'); g.addColorStop(1, '#0b0820');
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(8, 8, W - 16, H - 16, 28); ctx.fill();
+  ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = 30; ctx.strokeStyle = color; ctx.lineWidth = 6;
+  ctx.beginPath(); ctx.roundRect(14, 14, W - 28, H - 28, 24); ctx.stroke(); ctx.restore();
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 40; i++) { ctx.globalAlpha = 0.1 + 0.25 * ((i * 37) % 10) / 10; ctx.fillRect((i * 97) % W, (i * 53) % H, 2, 2); }
+  ctx.globalAlpha = 1;
+}
+
+// c: { step: 'art' | 'hands' | 'record' | 'fail', artIdx, handIdx, msg }; rec: { phase, t } from the Recorder.
+function drawCreate(ctx, c, arts, rec) {
+  const artId = arts[c.artIdx % arts.length], art = ARTS[artId], color = hex(art.color);
+  drawFrame(ctx, color);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#ffffff'; ctx.shadowColor = color; ctx.shadowBlur = 14;
+  ctx.font = 'bold 44px Georgia, serif'; ctx.fillText('Create a new spell', W / 2, 84); ctx.shadowBlur = 0;
+  const no = { art: 1, hands: 2, record: 3 }[c.step];
+  ctx.font = '24px Georgia, serif'; ctx.fillStyle = '#c9c0ff';
+  if (no) ctx.fillText('Step ' + no + ' of 3', W / 2, 122);
+  const orb = (x, y, r) => { const g = ctx.createRadialGradient(x, y, 4, x, y, r); g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, color); g.addColorStop(1, color + '00'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); };
+  if (c.step === 'art') {
+    ctx.font = '28px Georgia, serif'; ctx.fillStyle = '#e6deff'; ctx.fillText('Which spell will this sign cast?', W / 2, 180);
+    orb(W / 2, 340, 120);
+    ctx.font = 'bold 56px Georgia, serif'; ctx.fillStyle = color; ctx.shadowColor = color; ctx.shadowBlur = 18; ctx.fillText(art.name, W / 2, 520); ctx.shadowBlur = 0;
+    arts.forEach((id, i) => { ctx.beginPath(); ctx.arc(W / 2 + (i - (arts.length - 1) / 2) * 34, 566, i === c.artIdx % arts.length ? 10 : 6, 0, Math.PI * 2); ctx.fillStyle = hex(ARTS[id].color); ctx.globalAlpha = i === c.artIdx % arts.length ? 1 : 0.5; ctx.fill(); ctx.globalAlpha = 1; });
+    ctx.font = '22px Georgia, serif'; ctx.fillStyle = '#9d94d6'; ctx.fillText('Use the arrows to choose, then NEXT', W / 2, 610);
+  } else if (c.step === 'hands') {
+    ctx.font = '28px Georgia, serif'; ctx.fillStyle = '#e6deff'; ctx.fillText('Which hand(s) make the sign?', W / 2, 180);
+    const open = new Float32Array(HAND_DIM); open.set([0.97, 0.97, 0.97, 0.97, 0.97], 0);
+    HAND_OPTS.forEach(([mode, label], i) => {
+      const x = 90 + i * 166, sel = i === c.handIdx;
+      ctx.save(); ctx.globalAlpha = sel ? 1 : 0.4;
+      if (sel) { ctx.fillStyle = color + '33'; ctx.beginPath(); ctx.roundRect(x - 70, 250, 140, 230, 24); ctx.fill(); ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.stroke(); }
+      if (mode === 'two') { drawHand(ctx, open, x - 24, 430, 46, true, color); drawHand(ctx, open, x + 24, 430, 46, false, color); }
+      else drawHand(ctx, open, x, 430, 70, mode === 'left', color);
+      ctx.restore();
+      ctx.font = (sel ? 'bold ' : '') + '22px Georgia, serif'; ctx.fillStyle = sel ? '#ffffff' : '#9d94d6'; ctx.fillText(label, x, 512);
+    });
+    ctx.font = '26px Georgia, serif'; ctx.fillStyle = color; ctx.fillText('Casts: ' + art.name, W / 2, 570);
+    ctx.font = '22px Georgia, serif'; ctx.fillStyle = '#9d94d6'; ctx.fillText('Arrows to choose, then RECORD', W / 2, 612);
+  } else if (c.step === 'record') {
+    ctx.font = '26px Georgia, serif'; ctx.fillStyle = color; ctx.fillText(art.name + ' · ' + HAND_OPTS[c.handIdx][1], W / 2, 170);
+    if (rec.phase === 'countdown') {
+      ctx.font = 'bold 200px Georgia, serif'; ctx.fillStyle = '#ffffff'; ctx.shadowColor = color; ctx.shadowBlur = 30; ctx.fillText(String(Math.max(1, Math.ceil(rec.t))), W / 2, 380); ctx.shadowBlur = 0;
+      ctx.font = '28px Georgia, serif'; ctx.fillStyle = '#e6deff'; ctx.fillText('Get ready: make your sign', W / 2, 460);
+    } else {
+      ctx.font = 'bold 54px Georgia, serif'; ctx.fillStyle = '#ffd86b'; ctx.shadowColor = '#ff9a1f'; ctx.shadowBlur = 20; ctx.fillText('HOLD THE POSE', W / 2, 340); ctx.shadowBlur = 0;
+      const p = Math.min(1, Math.max(0, 1 - rec.t)); ctx.fillStyle = '#2a2050'; ctx.beginPath(); ctx.roundRect(70, 390, W - 140, 34, 17); ctx.fill();
+      ctx.fillStyle = color; ctx.beginPath(); ctx.roundRect(70, 390, Math.max(34, (W - 140) * p), 34, 17); ctx.fill();
+    }
+    ctx.font = '23px Georgia, serif'; ctx.fillStyle = '#9d94d6'; ctx.fillText('The words under your hands show what', W / 2, 530); ctx.fillText('spell each hand is making right now', W / 2, 560);
+  } else if (c.step === 'fail') {
+    ctx.font = 'bold 44px Georgia, serif'; ctx.fillStyle = '#ff9a9a'; ctx.fillText('Not saved', W / 2, 300);
+    ctx.font = '28px Georgia, serif'; ctx.fillStyle = '#e6deff';
+    const words = (c.msg || 'Tracking was lost. Try again.').split(' '); let line = '', y = 380;
+    for (const w of words) { if (ctx.measureText(line + w).width > W - 120) { ctx.fillText(line, W / 2, y); line = ''; y += 40; } line += w + ' '; }
+    ctx.fillText(line, W / 2, y);
+  }
+}
+
+const labelCache = new Map();
+function labelTexture(text, tone) { // 'normal' | 'gold' | 'dim'
+  const key = text + '|' + tone;
+  if (!labelCache.has(key)) labelCache.set(key, fuseTexture(tone === 'gold', text, tone === 'dim'));
+  return labelCache.get(key);
+}
+
 export class Spellbook {
   // getPages(): the list of page objects (see drawPage). tryFuse(artA, artB): { status: 'unlocked' | 'known' | 'invalid' }.
-  constructor({ scene, assets, getPages, tryFuse }) {
+  // recorder: the existing Recorder (the wizard records through it). getArts(): unlocked spell ids. persist(): save custom signs.
+  constructor({ scene, assets, getPages, tryFuse, recorder, getArts, persist }) {
     this.getPages = getPages; this.tryFuse = tryFuse || (() => ({ status: 'invalid' }));
+    this.recorder = recorder; this.getArts = getArts || (() => ['bolt']); this.persist = persist;
+    this.mode = 'browse'; this.create = null; this.started = false; this.recT = 0;
     this.pages = []; this.index = 0; this.t = 0;
     this.flip = null; this.open = null; this.mixer = null; this.timeScale = 0.6;
     this.fuseA = null; this.msg = ''; this.msgT = 0;
@@ -207,10 +287,11 @@ export class Spellbook {
       m.position.set(x, -0.235, 0.005); this.cardPivot.add(m);
       const b = { mesh: m, hw: w / 2, hh: h / 2, last: -1e9, fn }; this.buttons.push(b); return b;
     };
-    this.prevBtn = addBtn(0.075, 0.075, -0.2, arrowTexture(-1), () => this.go(-1));
-    this.nextBtn = addBtn(0.075, 0.075, 0.2, arrowTexture(1), () => this.go(1));
-    this.fuseIdle = fuseTexture(false, 'FUSE'); this.fuseOn = fuseTexture(true, 'FUSE ?');
-    this.fuseBtn = addBtn(0.13, 0.052, 0, this.fuseIdle, () => this.fusePress());
+    this.prevBtn = addBtn(0.075, 0.075, -0.2, arrowTexture(-1), () => this.onArrow(-1));
+    this.nextBtn = addBtn(0.075, 0.075, 0.2, arrowTexture(1), () => this.onArrow(1));
+    // Two centre buttons whose job depends on the mode: browsing = FUSE | CREATE; creating = back/cancel | next/record/done.
+    this.fuseBtn = addBtn(0.12, 0.048, -0.066, labelTexture('FUSE', 'normal'), () => this.onFuseBtn());
+    this.createBtn = addBtn(0.12, 0.048, 0.074, labelTexture('CREATE', 'normal'), () => this.onCreateBtn());
 
     // Announcement banner above the card.
     this.bannerCanvas = document.createElement('canvas'); this.bannerCanvas.width = 1024; this.bannerCanvas.height = 256;
@@ -237,12 +318,66 @@ export class Spellbook {
   }
 
   redraw() {
-    const s = this.pages[this.index];
+    const c = this.create;
+    if (this.mode === 'create' && c.step !== 'done') {
+      drawCreate(this.ctx, c, this.getArts(), { phase: this.recorder.phase, t: this.recorder.t });
+      this.tex.needsUpdate = true; this.setButtons();
+      return;
+    }
+    const done = this.mode === 'create'; // step 'done': show the page that was just made
+    const s = done ? c.sigil : this.pages[this.index];
     if (!s) return;
-    drawPage(this.ctx, s, this.index, this.pages.length, { msg: this.msg, fuseName: this.fuseA?.name });
-    this.tex.needsUpdate = true;
-    this.fuseBtn.mesh.material.map = this.fuseA ? this.fuseOn : this.fuseIdle; this.fuseBtn.mesh.material.needsUpdate = true;
+    const idx = done ? Math.max(0, this.pages.findIndex(p => p.id === s.id)) : this.index;
+    drawPage(this.ctx, s, idx, this.pages.length, { msg: done ? 'Saved! Make this pose to cast it' : this.msg, fuseName: this.fuseA?.name });
+    this.tex.needsUpdate = true; this.setButtons();
   }
+
+  // ---- the creation wizard: CREATE -> pick the spell -> pick the hand(s) -> record -> done ----------------------------
+  get creating() { return this.mode === 'create'; }
+
+  setLabel(btn, text, tone) { const m = btn.mesh.material, t = labelTexture(text, tone); if (m.map !== t) { m.map = t; m.needsUpdate = true; } }
+  setButtons() {
+    if (this.mode === 'browse') { this.setLabel(this.fuseBtn, this.fuseA ? 'FUSE ?' : 'FUSE', this.fuseA ? 'gold' : 'normal'); this.setLabel(this.createBtn, 'CREATE', 'normal'); return; }
+    const st = this.create.step;
+    this.setLabel(this.fuseBtn, { art: 'CANCEL', hands: 'BACK', record: 'CANCEL', done: 'RENAME', fail: 'BACK' }[st], 'normal');
+    this.setLabel(this.createBtn, { art: 'NEXT', hands: 'RECORD', record: '...', done: 'DONE', fail: 'RETRY' }[st], st === 'record' ? 'dim' : 'gold');
+  }
+  onArrow(d) { if (this.mode === 'browse') this.go(d); else this.createCycle(d); }
+  onFuseBtn() { if (this.mode === 'browse') this.fusePress(); else this.createSecondary(); }
+  onCreateBtn() { if (this.mode === 'browse') this.startCreate(); else this.createPrimary(); }
+
+  startCreate() {
+    if (this.open) return;
+    this.mode = 'create'; this.create = { step: 'art', artIdx: 0, handIdx: 0, sigil: null, msg: '' };
+    this.fuseA = null; this.msg = ''; this.started = false; this.redraw();
+  }
+  endCreate() { this.recorder.cancel(); this.mode = 'browse'; this.create = null; this.started = false; this.redraw(); }
+  createCycle(d) {
+    const c = this.create, n = this.getArts().length;
+    if (c.step === 'art') c.artIdx = (c.artIdx + d + n) % n; else if (c.step === 'hands') c.handIdx = (c.handIdx + d + 3) % 3;
+    this.redraw();
+  }
+  startRecording() {
+    const c = this.create, arts = this.getArts();
+    c.step = 'record'; this.started = true;
+    this.recorder.start(HAND_OPTS[c.handIdx][0], arts[c.artIdx % arts.length]);
+  }
+  createPrimary() {
+    const c = this.create;
+    if (c.step === 'art') c.step = 'hands';
+    else if (c.step === 'hands' || c.step === 'fail') this.startRecording();
+    else if (c.step === 'done') { const id = c.sigil?.id; this.endCreate(); const i = this.pages.findIndex(p => p.id === id); if (i >= 0) { this.index = i; this.redraw(); } return; }
+    this.redraw();
+  }
+  createSecondary() {
+    const c = this.create;
+    if (c.step === 'art') return this.endCreate();
+    if (c.step === 'hands' || c.step === 'fail') c.step = c.step === 'hands' ? 'art' : 'hands';
+    else if (c.step === 'record') { this.recorder.cancel(); this.started = false; c.step = 'hands'; }
+    else if (c.step === 'done') { c.sigil.name = randomName(); this.persist?.(); this.refresh(); } // re-roll the name
+    this.redraw();
+  }
+
 
   say(msg, sec = 2.4) { this.msg = msg; this.msgT = sec; this.redraw(); }
 
@@ -253,6 +388,10 @@ export class Spellbook {
 
   // A new custom Sigil was saved: jump to its page and play the discovery.
   discover(sigil) {
+    if (this.mode === 'create') { // saved through the wizard: give it a real name and show the result
+      sigil.name = randomName(); this.persist?.();
+      this.create.step = 'done'; this.create.sigil = sigil; this.started = false;
+    }
     this.refresh();
     const i = this.pages.findIndex(p => p.id === sigil.id);
     if (i >= 0) this.index = i;
@@ -333,6 +472,11 @@ export class Spellbook {
       const d = Math.hypot(this.root.position.x - head.x, this.root.position.z - head.z);
       if ((d < 0.45 || d > 3.5) && t - (this.lastPlace ?? -9) > 1) { this.place(head, fwd); this.lastPlace = t; }
     }
+    if (this.mode === 'create' && this.create.step === 'record') {
+      if (this.started && !this.recorder.active) { // the recording ended without saving (a save would already have moved us to 'done')
+        this.started = false; this.create.step = 'fail'; this.create.msg = this.recorder.message || 'Tracking was lost. Try again.'; this.redraw();
+      } else if (this.recorder.active && (this.recT -= dt) <= 0) { this.recT = 0.12; this.redraw(); } // live countdown / progress
+    }
     // message / fuse timeouts
     if (this.msgT > 0 && (this.msgT -= dt) <= 0) { this.msg = ''; this.redraw(); }
     if (this.fuseA && (this.fuseT -= dt) <= 0) { this.fuseA = null; this.say('Fuse timed out'); }
@@ -370,8 +514,8 @@ export class Spellbook {
     this.card.scale.setScalar(Math.max(0.001, cardK)); this.card.rotation.y = cardSpin;
     this.card.position.y = -(1 - cardK) * 0.4;
     this.banner.material.opacity = bannerA; this.banner.scale.setScalar(0.8 + 0.2 * Math.min(1, bannerA * 1.5));
-    for (const b of this.buttons) b.mesh.visible = this.pages.length > 1 && cardK > 0.9;
-    this.fuseBtn.mesh.scale.setScalar(this.fuseA ? 1 + 0.06 * Math.sin(t * 8) : 1); // the FUSE button pulses while a fuse is pending
+    for (const b of this.buttons) b.mesh.visible = (this.mode === 'create' || this.pages.length > 1) && cardK > 0.9;
+    this.fuseBtn.mesh.scale.setScalar(this.fuseA && this.mode === 'browse' ? 1 + 0.06 * Math.sin(t * 8) : 1); // the FUSE button pulses while a fuse is pending
     if (this.mixer) { this.action.timeScale = speed; this.mixer.update(dt); }
   }
 }
